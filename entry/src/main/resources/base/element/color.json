@@ -3,6 +3,34 @@
     {
       "name": "start_window_background",
       "value": "#FFFFFF"
+    },
+    {
+      "name": "brand_primary",
+      "value": "#2F6BFF"
+    },
+    {
+      "name": "brand_background",
+      "value": "#F6F7FB"
+    },
+    {
+      "name": "brand_surface",
+      "value": "#FFFFFF"
+    },
+    {
+      "name": "text_primary",
+      "value": "#1F2430"
+    },
+    {
+      "name": "text_secondary",
+      "value": "#667085"
+    },
+    {
+      "name": "status_success",
+      "value": "#12B76A"
+    },
+    {
+      "name": "status_warning",
+      "value": "#FFB020"
     }
   ]
 }

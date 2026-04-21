@@ -3,6 +3,22 @@
     {
       "name": "page_text_font_size",
       "value": "50fp"
+    },
+    {
+      "name": "page_padding",
+      "value": "16vp"
+    },
+    {
+      "name": "card_radius",
+      "value": "20vp"
+    },
+    {
+      "name": "title_font_size",
+      "value": "20fp"
+    },
+    {
+      "name": "body_font_size",
+      "value": "14fp"
     }
   ]
 }
