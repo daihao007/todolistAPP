@@ -1,66 +1,74 @@
 import { TodoVisualStatus, UiConstants, UiPalette } from '../common/Constants'
 import { TagChip } from './TagChip'
 
-/* 笔记卡片组件。统一承载标题、摘要、标签、日期、图片信息和待办状态，可用于首页、搜索页和详情预览。 */
 @Component
 export struct NoteCard {
-  /* 笔记标题。 */ @Prop title: string = ''
-  /* 笔记正文摘要。 */ @Prop content: string = ''
-  /* 日期文本，建议传入格式化后的字符串，例如 2026-04-21。 */ @Prop dateText: string = ''
-  /* 图片路径。当前版本用于展示“已插入图片”的占位信息。 */ @Prop imagePath: string = ''
-  /* 标签列表，例如 ['工作', '学习']。 */ @Prop tags: string[] = []
-  /* 待办状态，用于右上角状态胶囊显示。 */ @Prop todoStatus: TodoVisualStatus = TodoVisualStatus.PENDING
+  @Prop title: string = ''
+  @Prop content: string = ''
+  @Prop dateText: string = ''
+  @Prop imagePath: string = ''
+  @Prop tags: string[] = []
+  @Prop todoStatus: TodoVisualStatus = TodoVisualStatus.PENDING
 
-  /* 根据待办状态返回对应的文字色。 */
+  // --- C 同学新增：勾选回调接口 ---
+  onCheckboxChange?: (isDone: boolean) => void
+
   private getStatusTextColor(): string {
     switch (this.todoStatus) {
-      case TodoVisualStatus.COMPLETED:
-        return UiPalette.SUCCESS
-      case TodoVisualStatus.DEFERRED:
-        return UiPalette.WARNING
-      default:
-        return UiPalette.PRIMARY
+      case TodoVisualStatus.COMPLETED: return UiPalette.SUCCESS
+      case TodoVisualStatus.DEFERRED: return UiPalette.WARNING
+      default: return UiPalette.PRIMARY
     }
   }
 
-  /* 根据待办状态返回对应的浅色背景，方便状态展示更柔和。 */
   private getStatusBackgroundColor(): string {
     switch (this.todoStatus) {
-      case TodoVisualStatus.COMPLETED:
-        return UiPalette.SUCCESS_SOFT
-      case TodoVisualStatus.DEFERRED:
-        return UiPalette.WARNING_SOFT
-      default:
-        return UiPalette.PRIMARY_SOFT
+      case TodoVisualStatus.COMPLETED: return UiPalette.SUCCESS_SOFT
+      case TodoVisualStatus.DEFERRED: return UiPalette.WARNING_SOFT
+      default: return UiPalette.PRIMARY_SOFT
     }
   }
 
-  /* 对常用标签使用固定配色，保证全组页面风格一致。 */
   private getTagFillColor(tag: string): string {
     switch (tag) {
-      case '\u5DE5\u4F5C':
-        return UiPalette.TAG_WORK
-      case '\u5B66\u4E60':
-        return UiPalette.TAG_STUDY
-      case '\u751F\u6D3B':
-        return UiPalette.TAG_LIFE
-      default:
-        return UiPalette.SURFACE_MUTED
+      case '工作': return UiPalette.TAG_WORK
+      case '学习': return UiPalette.TAG_STUDY
+      case '生活': return UiPalette.TAG_LIFE
+      default: return UiPalette.SURFACE_MUTED
     }
   }
 
   build() {
     Column({ space: UiConstants.CONTENT_SPACING }) {
       Row() {
+        // --- 1. 新增左侧勾选框 ---
+        Checkbox({ name: 'noteCheck', group: 'notes' })
+          .select(this.todoStatus === TodoVisualStatus.COMPLETED) // 根据传入状态决定是否勾选
+          .selectedColor(UiPalette.SUCCESS)
+          .width(20)
+          .height(20)
+          .margin({ right: 12, top: 2 }) // 微调对齐
+          .onChange((value: boolean) => {
+            if (this.onCheckboxChange) {
+              this.onCheckboxChange(value)
+            }
+          })
+
         Column({ space: 8 }) {
-          /* 标题限制为一行，避免列表中的卡片高度不统一。 */ Text(this.title)
+          /* 标题：新增删除线逻辑 */
+          Text(this.title)
             .fontSize(18)
             .fontWeight(FontWeight.Bold)
-            .fontColor(UiPalette.TEXT_PRIMARY)
+            .fontColor(this.todoStatus === TodoVisualStatus.COMPLETED ? UiPalette.TEXT_MUTED : UiPalette.TEXT_PRIMARY)
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
+            // 关键：已完成状态显示删除线
+            .decoration({
+              type: this.todoStatus === TodoVisualStatus.COMPLETED ? TextDecorationType.LineThrough : TextDecorationType.None,
+              color: UiPalette.TEXT_MUTED
+            })
 
-          /* 正文摘要最多展示三行，兼顾信息量和可读性。 */ Text(this.content)
+          Text(this.content)
             .fontSize(UiConstants.BODY_SIZE)
             .fontColor(UiPalette.TEXT_SECONDARY)
             .lineHeight(22)
@@ -70,83 +78,48 @@ export struct NoteCard {
         .layoutWeight(1)
         .alignItems(HorizontalAlign.Start)
 
+        // 右上角状态胶囊（保留 D 同学的视觉设计）
         Text(this.todoStatus)
           .fontSize(UiConstants.CAPTION_SIZE)
           .fontColor(this.getStatusTextColor())
-          .padding({ left: 10, right: 10, top: 6, bottom: 6 })
+          .padding({ left: 10, right: 10, top: 4, bottom: 4 })
           .backgroundColor(this.getStatusBackgroundColor())
           .borderRadius(UiConstants.CHIP_RADIUS)
-          .margin({ left: 12 })
+          .margin({ left: 8 })
       }
       .width('100%')
       .alignItems(VerticalAlign.Top)
 
+      // --- 下方的图片预览和标签区保持原样 ---
       if (this.imagePath.length > 0) {
-        /* 后续如果接入真实缩略图，这一块可以直接替换成 Image 组件。 */
         Row({ space: 10 }) {
           Stack() {
-            Row()
-              .width(54)
-              .height(54)
-              .borderRadius(14)
-              .backgroundColor(UiPalette.PRIMARY_SOFT)
-
-            Text('IMG')
-              .fontSize(UiConstants.CAPTION_SIZE)
-              .fontColor(UiPalette.PRIMARY)
-              .fontWeight(FontWeight.Medium)
+            Row().width(54).height(54).borderRadius(14).backgroundColor(UiPalette.PRIMARY_SOFT)
+            Text('IMG').fontSize(UiConstants.CAPTION_SIZE).fontColor(UiPalette.PRIMARY)
           }
-
           Column({ space: 4 }) {
-            Text('\u5DF2\u63D2\u5165\u672C\u5730\u56FE\u7247')
-              .fontSize(UiConstants.CAPTION_SIZE)
-              .fontColor(UiPalette.TEXT_PRIMARY)
-
-            Text(this.imagePath)
-              .fontSize(UiConstants.CAPTION_SIZE)
-              .fontColor(UiPalette.TEXT_MUTED)
-              .maxLines(1)
-              .textOverflow({ overflow: TextOverflow.Ellipsis })
-          }
-          .alignItems(HorizontalAlign.Start)
-          .layoutWeight(1)
+            Text('已插入本地图片').fontSize(UiConstants.CAPTION_SIZE).fontColor(UiPalette.TEXT_PRIMARY)
+            Text(this.imagePath).fontSize(UiConstants.CAPTION_SIZE).fontColor(UiPalette.TEXT_MUTED).maxLines(1)
+          }.alignItems(HorizontalAlign.Start).layoutWeight(1)
         }
-        .padding(12)
-        .backgroundColor(UiPalette.SURFACE_MUTED)
-        .borderRadius(16)
-        .width('100%')
+        .padding(12).backgroundColor(UiPalette.SURFACE_MUTED).borderRadius(16).width('100%')
       }
 
       Row() {
         Row({ space: 8 }) {
-          /* 标签区复用 TagChip，减少重复样式代码。 */
           ForEach(this.tags, (tag: string) => {
-            TagChip({
-              label: tag,
-              fillColor: this.getTagFillColor(tag),
-              textColor: UiPalette.TEXT_PRIMARY
-            })
+            TagChip({ label: tag, fillColor: this.getTagFillColor(tag), textColor: UiPalette.TEXT_PRIMARY })
           }, (tag: string) => tag)
-        }
-        .layoutWeight(1)
-
-        Text(this.dateText)
-          .fontSize(UiConstants.CAPTION_SIZE)
-          .fontColor(UiPalette.TEXT_MUTED)
+        }.layoutWeight(1)
+        Text(this.dateText).fontSize(UiConstants.CAPTION_SIZE).fontColor(UiPalette.TEXT_MUTED)
       }
       .width('100%')
       .justifyContent(FlexAlign.SpaceBetween)
-      .alignItems(VerticalAlign.Center)
     }
     .width('100%')
     .padding(16)
     .backgroundColor(UiPalette.SURFACE)
     .borderRadius(UiConstants.CARD_RADIUS)
-    .shadow({
-      radius: UiConstants.CARD_SHADOW_RADIUS,
-      color: '#140F172A',
-      offsetX: 0,
-      offsetY: 8
-    })
+    .shadow({ radius: 8, color: '#140F172A', offsetY: 4 })
   }
 }
