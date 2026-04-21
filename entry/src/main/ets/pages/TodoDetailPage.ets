@@ -2,6 +2,7 @@ import { NoteCard } from '../components/NoteCard'
 import { TodoStatusSwitch } from '../components/TodoStatusSwitch'
 import { TodoVisualStatus, UiConstants, UiPalette } from '../common/Constants'
 
+@Entry
 @Component
 export struct TodoDetailPage {
   @State todoStatus: TodoVisualStatus = TodoVisualStatus.PENDING

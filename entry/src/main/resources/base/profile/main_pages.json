@@ -1,7 +1,9 @@
 {
   "src": [
     "pages/Index",
+    "pages/NoteEditPage",
     "pages/TestSearchPage",
-    "pages/SearchResultPage"
+    "pages/SearchResultPage",
+    "pages/TodoDetailPage"
   ]
 }

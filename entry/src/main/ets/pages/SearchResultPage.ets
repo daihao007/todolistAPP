@@ -17,7 +17,7 @@ export struct SearchResultPage {
   @State filteredNotes: Note[] = []
 
   // 初始化数据库管理器
-  private db: RdbStoreManager = new RdbStoreManager(getContext(this) as common.UIAbilityContext)
+  private db: RdbStoreManager = RdbStoreManager.getInstance(getContext(this) as common.Context)
 
   // 页面进入时初始化并首查
   async aboutToAppear() {
