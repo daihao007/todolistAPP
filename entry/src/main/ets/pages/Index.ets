@@ -14,8 +14,8 @@ struct Index {
   // --- C 同学新增：驱动 UI 的真实数据源 ---
   @State allNotes: Note[] = []
 
-  // 初始化数据库管理器
-  private db: RdbStoreManager = new RdbStoreManager(getContext(this) as common.UIAbilityContext)
+  // ✅ 修复：由于构造函数私有，必须使用单例静态方法获取实例
+  private db: RdbStoreManager = RdbStoreManager.getInstance(getContext(this) as common.Context)
 
   async aboutToAppear() {
     await this.db.initDb()
@@ -48,10 +48,39 @@ struct Index {
     try {
       console.info('C_LOG: 准备开始注入数据...');
       const timestamp = Date.now();
+
+      // ✅ 修复：必须补齐 todoStatus 属性，否则会报类型缺失错误
       const testNotes: Note[] = [
-        { id: 'test_' + timestamp + '_1', title: '周一开会', content: '讨论搜索功能实现', imagePath: '', tags: '工作', createTime: timestamp, isTodo: 1 },
-        { id: 'test_' + timestamp + '_2', title: '超市买菜', content: '买西红柿和鸡蛋', imagePath: '', tags: '生活', createTime: timestamp, isTodo: 0 },
-        { id: 'test_' + timestamp + '_3', title: '学习ArkTS', content: '掌握RDB数据库操作', imagePath: '', tags: '学习', createTime: timestamp, isTodo: 1 }
+        {
+          id: 'test_' + timestamp + '_1',
+          title: '周一开会',
+          content: '讨论搜索功能实现',
+          imagePath: '',
+          tags: '工作',
+          createTime: timestamp,
+          isTodo: 1,
+          todoStatus: TodoVisualStatus.PENDING // 手动补齐枚举状态
+        },
+        {
+          id: 'test_' + timestamp + '_2',
+          title: '超市买菜',
+          content: '买西红柿和鸡蛋',
+          imagePath: '',
+          tags: '生活',
+          createTime: timestamp,
+          isTodo: 0,
+          todoStatus: TodoVisualStatus.COMPLETED // 手动补齐枚举状态
+        },
+        {
+          id: 'test_' + timestamp + '_3',
+          title: '学习ArkTS',
+          content: '掌握RDB数据库操作',
+          imagePath: '',
+          tags: '学习',
+          createTime: timestamp,
+          isTodo: 1,
+          todoStatus: TodoVisualStatus.PENDING // 手动补齐枚举状态
+        }
       ]
 
       for (let note of testNotes) {
@@ -126,8 +155,8 @@ struct Index {
                 content: note.content,
                 dateText: new Date(note.createTime).toLocaleDateString(),
                 tags: note.tags ? note.tags.split(',') : [],
-                // 1 为待办，0 为完成
-                todoStatus: note.isTodo === 1 ? TodoVisualStatus.PENDING : TodoVisualStatus.COMPLETED,
+                // ✅ 修复：使用显式类型断言，确保与 NoteCard 的枚举类型一致
+                todoStatus: note.todoStatus as TodoVisualStatus,
                 imagePath: note.imagePath,
                 // ⭐ 核心回调：首页勾选实时回写
                 onCheckboxChange: (isDone: boolean) => {

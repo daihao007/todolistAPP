@@ -1,35 +1,30 @@
-/**
- * 基础业务常量
- */
 export class CommonConstants {
-  // 数据库信息
-  static readonly RDB_NAME = 'InspirationNote.db';
-  static readonly TABLE_NOTES = 'notes';
-  static readonly TABLE_TODOS = 'todos';
+  static readonly RDB_NAME: string = 'InspirationNote.db'
+  static readonly TABLE_NOTES: string = 'notes'
+  static readonly TABLE_TODOS: string = 'todos'
 
-  // 统一字段名（防止手抖写错）
-  static readonly COL_ID = 'id';
-  static readonly COL_TITLE = 'title';
-  static readonly COL_CONTENT = 'content';
-  static readonly COL_CREATE_TIME = 'createTime';
+  static readonly COL_ID: string = 'id'
+  static readonly COL_TITLE: string = 'title'
+  static readonly COL_CONTENT: string = 'content'
+  static readonly COL_IMAGE_PATH: string = 'imagePath'
+  static readonly COL_TAGS: string = 'tags'
+  static readonly COL_CREATE_TIME: string = 'createTime'
+  static readonly COL_IS_TODO: string = 'isTodo'
+  static readonly COL_TODO_STATUS: string = 'todoStatus'
 
-  // 路由路径（给 E 同学用）
-  static readonly PAGE_INDEX = 'pages/Index';
-  static readonly PAGE_EDIT = 'pages/NoteEditPage';
+  static readonly PAGE_INDEX: string = 'pages/Index'
+  static readonly PAGE_EDIT: string = 'pages/NoteEditPage'
+  static readonly PAGE_SEARCH: string = 'pages/SearchResultPage'
+
+  static readonly DEFAULT_TAGS: string[] = ['工作', '学习', '生活']
 }
 
-/**
- * 待办事项显示状态枚举
- */
 export enum TodoVisualStatus {
   PENDING = '待处理',
   COMPLETED = '已完成',
   DEFERRED = '已延期'
 }
 
-/**
- * UI 布局常量（给 D、E 同学定义间距和圆角）
- */
 export class UiConstants {
   static readonly PAGE_PADDING: number = 16
   static readonly CARD_RADIUS: number = 20
@@ -44,9 +39,6 @@ export class UiConstants {
   static readonly CARD_SHADOW_RADIUS: number = 18
 }
 
-/**
- * 调色盘（全组统一配色方案）
- */
 export class UiPalette {
   static readonly PAGE_BACKGROUND: string = '#F6F7FB'
   static readonly SURFACE: string = '#FFFFFF'
@@ -69,12 +61,9 @@ export class UiPalette {
   static readonly TAG_LIFE: string = '#FFF1F3'
 }
 
-/**
- * 界面文案（防止硬编码）
- */
 export class UiCopywriting {
   static readonly DESIGN_TITLE: string = '灵感笔记'
-  static readonly DESIGN_SUBTITLE: string = '统一组件和视觉规范示例'
-  static readonly NOTE_PREVIEW_TITLE: string = '用一张卡片承接灵感和任务'
-  static readonly NOTE_PREVIEW_BODY: string = '支持标题、正文摘要、标签、图片缩略信息和待办状态，让首页列表看起来统一、清爽、可扫描。'
+  static readonly DESIGN_SUBTITLE: string = '记录标题、正文、图片与待办状态，首页会自动读取数据库中的真实笔记。'
+  static readonly NOTE_PREVIEW_TITLE: string = '用一张卡片承载灵感和任务'
+  static readonly NOTE_PREVIEW_BODY: string = '支持标题、正文摘要、标签、图片预览和待办状态，让首页列表更统一、更易读。'
 }
