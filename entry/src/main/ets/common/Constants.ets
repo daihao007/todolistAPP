@@ -1,0 +1,80 @@
+/**
+ * 基础业务常量
+ */
+export class CommonConstants {
+  // 数据库信息
+  static readonly RDB_NAME = 'InspirationNote.db';
+  static readonly TABLE_NOTES = 'notes';
+  static readonly TABLE_TODOS = 'todos';
+
+  // 统一字段名（防止手抖写错）
+  static readonly COL_ID = 'id';
+  static readonly COL_TITLE = 'title';
+  static readonly COL_CONTENT = 'content';
+  static readonly COL_CREATE_TIME = 'createTime';
+
+  // 路由路径（给 E 同学用）
+  static readonly PAGE_INDEX = 'pages/Index';
+  static readonly PAGE_EDIT = 'pages/NoteEditPage';
+}
+
+/**
+ * 待办事项显示状态枚举
+ */
+export enum TodoVisualStatus {
+  PENDING = '待处理',
+  COMPLETED = '已完成',
+  DEFERRED = '已延期'
+}
+
+/**
+ * UI 布局常量（给 D、E 同学定义间距和圆角）
+ */
+export class UiConstants {
+  static readonly PAGE_PADDING: number = 16
+  static readonly CARD_RADIUS: number = 20
+  static readonly CHIP_RADIUS: number = 12
+  static readonly BUTTON_RADIUS: number = 16
+  static readonly SECTION_SPACING: number = 16
+  static readonly CONTENT_SPACING: number = 12
+  static readonly TITLE_SIZE: number = 20
+  static readonly SUBTITLE_SIZE: number = 16
+  static readonly BODY_SIZE: number = 14
+  static readonly CAPTION_SIZE: number = 12
+  static readonly CARD_SHADOW_RADIUS: number = 18
+}
+
+/**
+ * 调色盘（全组统一配色方案）
+ */
+export class UiPalette {
+  static readonly PAGE_BACKGROUND: string = '#F6F7FB'
+  static readonly SURFACE: string = '#FFFFFF'
+  static readonly SURFACE_MUTED: string = '#F0F3FA'
+  static readonly PRIMARY: string = '#2F6BFF'
+  static readonly PRIMARY_SOFT: string = '#E8EEFF'
+  static readonly ACCENT: string = '#23B18A'
+  static readonly TEXT_PRIMARY: string = '#1F2430'
+  static readonly TEXT_SECONDARY: string = '#667085'
+  static readonly TEXT_MUTED: string = '#98A2B3'
+  static readonly BORDER: string = '#E4E7EC'
+  static readonly WARNING: string = '#FFB020'
+  static readonly WARNING_SOFT: string = '#FFF3D6'
+  static readonly SUCCESS: string = '#12B76A'
+  static readonly SUCCESS_SOFT: string = '#DCFCE7'
+  static readonly DANGER: string = '#F04438'
+  static readonly DANGER_SOFT: string = '#FEE4E2'
+  static readonly TAG_WORK: string = '#EEF4FF'
+  static readonly TAG_STUDY: string = '#ECFDF3'
+  static readonly TAG_LIFE: string = '#FFF1F3'
+}
+
+/**
+ * 界面文案（防止硬编码）
+ */
+export class UiCopywriting {
+  static readonly DESIGN_TITLE: string = '灵感笔记'
+  static readonly DESIGN_SUBTITLE: string = '统一组件和视觉规范示例'
+  static readonly NOTE_PREVIEW_TITLE: string = '用一张卡片承接灵感和任务'
+  static readonly NOTE_PREVIEW_BODY: string = '支持标题、正文摘要、标签、图片缩略信息和待办状态，让首页列表看起来统一、清爽、可扫描。'
+}
