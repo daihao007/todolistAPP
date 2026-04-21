@@ -34,7 +34,7 @@ export default class EntryAbility extends UIAbility {
   onWindowStageCreate(windowStage: window.WindowStage): void {
     hilog.info(DOMAIN, 'EntryAbility', '%{public}s', 'Ability onWindowStageCreate')
 
-    windowStage.loadContent(CommonConstants.PAGE_INDEX, (err) => {
+    windowStage.loadContent('pages/LoginPage', (err) => {
       if (err.code) {
         hilog.error(DOMAIN, 'EntryAbility', 'Failed to load the content. Cause: %{public}s', JSON.stringify(err))
         return
