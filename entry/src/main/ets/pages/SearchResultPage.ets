@@ -20,6 +20,7 @@ class SearchNoteItem {
   }
 }
 
+@Entry
 @Component
 export struct SearchResultPage {
   @State keyword: string = ''
