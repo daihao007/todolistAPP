@@ -1,32 +1,35 @@
-// ets/model/Note.ets
+import { TodoVisualStatus } from '../common/Constants'
+
 export interface Note {
-  id: string;
-  title: string;
-  content: string;
-  imagePath: string;
-  tags: string; // 注意：RDB数据库存字符串比较简单，多个标签用逗号隔开，如 "工作,重要"
-  createTime: number;
-  isTodo: number; // 0代表不是待办，1代表是
+  id: string
+  title: string
+  content: string
+  imagePath: string
+  tags: string
+  createTime: number
+  isTodo: number
+  todoStatus: string
 }
 
-// 这里的假数据，发给 D 同学，让他用在 NoteCard 组件里
 export const MockNotes: Note[] = [
   {
     id: '1',
     title: '小组作业开会记录',
-    content: '今天讨论了 ArkTS 的项目结构，大家分工明确。',
+    content: '今天讨论了 ArkTS 项目结构和页面分工，确认先把编辑页和首页打通。',
     imagePath: '',
-    tags: '学校,作业',
+    tags: '工作,学习',
     createTime: Date.now(),
-    isTodo: 1
+    isTodo: 1,
+    todoStatus: TodoVisualStatus.PENDING
   },
   {
     id: '2',
-    title: '买水果',
-    content: '西瓜、苹果、香蕉',
+    title: '周末采买清单',
+    content: '西瓜、苹果、香菜和牛奶。',
     imagePath: '',
     tags: '生活',
-    createTime: Date.now(),
-    isTodo: 0
+    createTime: Date.now() - 86400000,
+    isTodo: 1,
+    todoStatus: TodoVisualStatus.COMPLETED
   }
 ]
