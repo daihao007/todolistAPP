@@ -11,6 +11,14 @@
     {
       "name": "EntryAbility_label",
       "value": "label"
+    },
+    {
+      "name": "app_name",
+      "value": "灵感笔记"
+    },
+    {
+      "name": "design_desc",
+      "value": "统一视觉组件示例"
     }
   ]
 }
