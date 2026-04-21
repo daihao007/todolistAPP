@@ -130,4 +130,69 @@ export class RdbStoreManager {
     resultSet.close();
     return null;
   }
+  /**
+   * 模糊搜索：根据标题或内容搜索笔记
+   * 对应任务：让笔记能被搜到
+   */
+  async searchNotes(keyword: string): Promise<Note[]> {
+    if (!this.store || !keyword) return this.queryAllNotes();
+
+    let predicates = new relationalStore.RdbPredicates(CommonConstants.TABLE_NOTES);
+    // 使用 contains 实现 SQL 的 LIKE %keyword% 效果
+    predicates.contains('title', keyword)
+      .or()
+      .contains('content', keyword)
+      .orderByDesc('createTime');
+
+    let resultSet = await this.store.query(predicates);
+    let result: Note[] = [];
+    while (resultSet.goToNextRow()) {
+      result.push({
+        id: resultSet.getString(resultSet.getColumnIndex('id')),
+        title: resultSet.getString(resultSet.getColumnIndex('title')),
+        content: resultSet.getString(resultSet.getColumnIndex('content')),
+        imagePath: resultSet.getString(resultSet.getColumnIndex('imagePath')),
+        tags: resultSet.getString(resultSet.getColumnIndex('tags')),
+        createTime: resultSet.getLong(resultSet.getColumnIndex('createTime')),
+        isTodo: resultSet.getLong(resultSet.getColumnIndex('isTodo'))
+      });
+    }
+    resultSet.close();
+    return result;
+  }
+
+  /**
+   * 更新待办状态：勾选/取消勾选
+   * 对应任务：让待办能被勾选，触发 UI 刷新
+   */
+  async updateTodoStatus(id: string, newStatus: number) {
+    if (!this.store) return;
+
+    const valueBucket: relationalStore.ValuesBucket = {
+      'status': newStatus
+    };
+
+    let predicates = new relationalStore.RdbPredicates(CommonConstants.TABLE_TODOS);
+    predicates.equalTo('id', id);
+
+    return await this.store.update(valueBucket, predicates);
+  }
+  /**
+   * 专门为搜索页/首页提供的笔记勾选状态更新
+   * @param noteId 笔记的ID
+   * @param isDone 是否勾选完成
+   */
+  async updateNoteCompleteStatus(noteId: string, isDone: boolean) {
+    if (!this.store) return;
+
+    const valueBucket: relationalStore.ValuesBucket = {
+      // 根据你的 NoteCard 逻辑：1 是待办(PENDING)，0 是完成(COMPLETED)
+      'isTodo': isDone ? 0 : 1
+    };
+
+    let predicates = new relationalStore.RdbPredicates(CommonConstants.TABLE_NOTES);
+    predicates.equalTo('id', noteId);
+
+    return await this.store.update(valueBucket, predicates);
+  }
 }
