@@ -1,97 +1,121 @@
-import { NoteCard } from '../components/NoteCard'
-import { TagChip } from '../components/TagChip'
-import { TodoStatusSwitch } from '../components/TodoStatusSwitch'
-import { TodoVisualStatus, UiConstants, UiCopywriting, UiPalette } from '../common/Constants'
 import router from '@ohos.router'
+import common from '@ohos.app.ability.common'
+import {
+  CommonConstants,
+  TodoVisualStatus,
+  UiConstants,
+  UiCopywriting,
+  UiPalette
+} from '../common/Constants'
+import { CommonEmptyView } from '../components/CommonEmptyView'
+import { NoteCard } from '../components/NoteCard'
 import { RdbStoreManager } from '../database/RdbStoreManager'
 import { Note } from '../model/Note'
-import common from '@ohos.app.ability.common'
+import { NoteCardViewData, NoteViewModel } from '../viewmodel/NoteViewModel'
 
 @Entry
 @Component
 struct Index {
-  @State currentStatus: TodoVisualStatus = TodoVisualStatus.PENDING
-  // --- C 同学新增：驱动 UI 的真实数据源 ---
-  @State allNotes: Note[] = []
+  @State noteList: NoteCardViewData[] = []
+  @State loading: boolean = true
+  @State helperText: string = ''
 
-  // ✅ 修复：由于构造函数私有，必须使用单例静态方法获取实例
+  private noteViewModel: NoteViewModel | null = null
   private db: RdbStoreManager = RdbStoreManager.getInstance(getContext(this) as common.Context)
 
+  // ✅ 核心修复点 1：使用 async/await 确保初始化顺序
   async aboutToAppear() {
-    await this.db.initDb()
-    await this.refreshData() // 页面进入时加载一次数据
-  }
-
-  /**
-   * 从数据库刷新数据并更新 UI
-   */
-  async refreshData() {
-    const data = await this.db.queryAllNotes()
-    this.allNotes = data
-    console.info('C_LOG: 首页数据已刷新，当前笔记总数: ' + this.allNotes.length)
-  }
-
-  /**
-   * 处理勾选逻辑：回写数据库并局部刷新
-   */
-  async handleToggle(noteId: string, isDone: boolean) {
-    // 调用之前在 RdbStoreManager 写的更新方法 (操作 TABLE_NOTES)
-    await this.db.updateNoteCompleteStatus(noteId, isDone)
-    // 重新获取数据，触发 @State 变更
-    await this.refreshData()
-  }
-
-  /**
-   * 实验室辅助功能：快速造数据
-   */
-  async seedTestData() {
+    this.ensureViewModel()
     try {
-      console.info('C_LOG: 准备开始注入数据...');
-      const timestamp = Date.now();
+      // 必须先等数据库初始化完成
+      await this.db.initDb()
+      // 数据库就绪后再加载笔记
+      await this.loadNotes()
+    } catch (err) {
+      console.error('C_LOG: 初始化失败', JSON.stringify(err))
+    }
+  }
 
-      // ✅ 修复：必须补齐 todoStatus 属性，否则会报类型缺失错误
+  // ✅ 核心修复点 2：页面展示时（如从编辑页回来）自动刷新
+  onPageShow(): void {
+    void this.loadNotes()
+  }
+
+  private ensureViewModel(): void {
+    if (this.noteViewModel !== null) return
+    const context = getContext(this) as common.UIAbilityContext
+    this.noteViewModel = new NoteViewModel(context)
+  }
+
+  /**
+   * 加载数据
+   */
+  private async loadNotes(): Promise<void> {
+    this.ensureViewModel()
+    if (this.noteViewModel === null) return
+
+    this.loading = true
+    try {
+      // 确保在查询前 DB 是初始化的（ViewModel 内部通常也会处理，但这里双重保险）
+      this.noteList = await this.noteViewModel.loadNotes()
+      this.helperText = ''
+    } catch (error) {
+      this.noteList = []
+      this.helperText = '获取笔记失败'
+    } finally {
+      this.loading = false
+    }
+  }
+
+  /**
+   * 实验室造数据
+   */
+  private async seedTestData() {
+    try {
+      const ts = Date.now();
       const testNotes: Note[] = [
         {
-          id: 'test_' + timestamp + '_1',
-          title: '周一开会',
-          content: '讨论搜索功能实现',
+          id: 'test_' + ts + '_1',
+          title: '周一开会 (待办)',
+          content: '点击勾选试试删除线效果',
           imagePath: '',
           tags: '工作',
-          createTime: timestamp,
+          createTime: ts,
           isTodo: 1,
-          todoStatus: TodoVisualStatus.PENDING // 手动补齐枚举状态
+          todoStatus: TodoVisualStatus.PENDING
         },
         {
-          id: 'test_' + timestamp + '_2',
-          title: '超市买菜',
-          content: '买西红柿和鸡蛋',
+          id: 'test_' + ts + '_2',
+          title: '已完成事项',
+          content: '这是一条已经带删除线的笔记',
           imagePath: '',
           tags: '生活',
-          createTime: timestamp,
+          createTime: ts,
           isTodo: 0,
-          todoStatus: TodoVisualStatus.COMPLETED // 手动补齐枚举状态
-        },
-        {
-          id: 'test_' + timestamp + '_3',
-          title: '学习ArkTS',
-          content: '掌握RDB数据库操作',
-          imagePath: '',
-          tags: '学习',
-          createTime: timestamp,
-          isTodo: 1,
-          todoStatus: TodoVisualStatus.PENDING // 手动补齐枚举状态
+          todoStatus: TodoVisualStatus.COMPLETED
         }
       ]
-
+      // 这里的 await 保证了数据写完才刷新 UI
+      await this.db.initDb()
       for (let note of testNotes) {
-        await this.db.insertNote(note);
+        await this.db.insertNote(note)
       }
-
-      await this.refreshData() // 注入后立即刷新显示
-      AlertDialog.show({ message: '数据注入成功，列表已更新！' })
+      await this.loadNotes()
+      AlertDialog.show({ message: '测试数据注入成功！' })
     } catch (err) {
-      console.error('C_LOG: 注入失败: ' + JSON.stringify(err));
+      this.helperText = '注入失败'
     }
+  }
+
+  private openCreatePage(): void {
+    router.pushUrl({ url: CommonConstants.PAGE_EDIT })
+  }
+
+  private openEditPage(noteId: string): void {
+    router.pushUrl({
+      url: CommonConstants.PAGE_EDIT,
+      params: { noteId: noteId }
+    })
   }
 
   build() {
@@ -99,84 +123,76 @@ struct Index {
       Column({ space: UiConstants.SECTION_SPACING }) {
 
         // ==========================================
-        // 🚀 C 同学实验室控制台 (测试完记得删掉哦)
+        // 🚀 实验室控制台
         // ==========================================
         Column({ space: 10 }) {
-          Text('C 同学逻辑实验室控制台')
-            .fontSize(14).fontColor(Color.White).fontWeight(FontWeight.Bold)
-
+          Text('C 逻辑实验室 - 交互同步版')
+            .fontSize(14).fontColor(Color.White).fontWeight(FontWeight.Medium)
           Row({ space: 10 }) {
-            Button('1. 注入测试数据').layoutWeight(1).height(36)
-              .backgroundColor(UiPalette.SUCCESS).onClick(() => this.seedTestData())
-
-            Button('2. 进入搜索测试').layoutWeight(1).height(36)
-              .backgroundColor(UiPalette.DANGER).onClick(() => {
-              router.pushUrl({ url: 'pages/SearchResultPage' })
-            })
+            Button('注入测试数据').layoutWeight(1).height(36).fontSize(12).backgroundColor(UiPalette.SUCCESS)
+              .onClick(() => this.seedTestData())
+            Button('清空/刷新').layoutWeight(1).height(36).fontSize(12).backgroundColor(UiPalette.PRIMARY)
+              .onClick(() => this.loadNotes())
           }
         }
         .width('100%').padding(15).backgroundColor('#1F2430').borderRadius(UiConstants.CARD_RADIUS)
 
         // ==========================================
-        // 头部欢迎区
+        // 头部导航
         // ==========================================
         Column({ space: 6 }) {
-          Text(UiCopywriting.DESIGN_TITLE).fontSize(28).fontWeight(FontWeight.Bold).fontColor(UiPalette.TEXT_PRIMARY)
+          Text(UiCopywriting.DESIGN_TITLE).fontSize(28).fontWeight(FontWeight.Bold)
           Text(UiCopywriting.DESIGN_SUBTITLE).fontSize(UiConstants.BODY_SIZE).fontColor(UiPalette.TEXT_SECONDARY)
         }.alignItems(HorizontalAlign.Start).width('100%')
 
-        // 快捷操作按钮
         Row({ space: 10 }) {
-          Button('打开编辑页').layoutWeight(1).height(46).backgroundColor(UiPalette.PRIMARY)
-            .onClick(() => router.pushUrl({ url: 'pages/NoteEditPage' }))
-
-          Button('打开搜索页').layoutWeight(1).height(46).backgroundColor(UiPalette.SURFACE).fontColor(UiPalette.TEXT_PRIMARY)
-            .onClick(() => router.pushUrl({ url: 'pages/SearchResultPage' }))
+          Button('新建笔记').layoutWeight(1).height(46).backgroundColor(UiPalette.PRIMARY)
+            .onClick(() => this.openCreatePage())
+          Button('搜索').layoutWeight(1).height(46).backgroundColor(UiPalette.SURFACE).fontColor(UiPalette.TEXT_PRIMARY)
+            .onClick(() => router.pushUrl({ url: CommonConstants.PAGE_SEARCH }))
         }.width('100%')
 
         // ==========================================
-        // 真实数据列表区
+        // 列表展示区
         // ==========================================
         Column({ space: 12 }) {
-          Text('我的笔记动态列表')
-            .fontSize(UiConstants.SUBTITLE_SIZE).fontWeight(FontWeight.Bold).fontColor(UiPalette.TEXT_PRIMARY)
+          Text('我的笔记').fontSize(UiConstants.TITLE_SIZE).fontWeight(FontWeight.Bold)
 
-          if (this.allNotes.length === 0) {
-            // 缺省状态
-            Column() {
-              Text('数据库空空如也').fontSize(14).fontColor(UiPalette.TEXT_MUTED)
-              Text('请使用上方实验室按钮注入数据').fontSize(12).fontColor(UiPalette.TEXT_MUTED).margin({ top: 4 })
-            }.width('100%').padding(40).alignItems(HorizontalAlign.Center)
+          if (this.loading) {
+            CommonEmptyView({ title: '加载中...', description: '正在从本地数据库同步内容' })
+          } else if (this.noteList.length === 0) {
+            CommonEmptyView({ title: '无笔记', description: '点击注入数据或新建笔记开始记录吧' })
           } else {
-            // 动态渲染
-            ForEach(this.allNotes, (note: Note) => {
-              NoteCard({
-                title: note.title,
-                content: note.content,
-                dateText: new Date(note.createTime).toLocaleDateString(),
-                tags: note.tags ? note.tags.split(',') : [],
-                // ✅ 修复：使用显式类型断言，确保与 NoteCard 的枚举类型一致
-                todoStatus: note.todoStatus as TodoVisualStatus,
-                imagePath: note.imagePath,
-                // ⭐ 核心回调：首页勾选实时回写
-                onCheckboxChange: (isDone: boolean) => {
-                  this.handleToggle(note.id, isDone)
-                }
+            ForEach(this.noteList, (note: NoteCardViewData) => {
+              Column() {
+                NoteCard({
+                  title: note.title,
+                  content: note.content,
+                  dateText: note.dateText,
+                  imagePath: note.imagePath,
+                  tags: note.tags,
+                  todoStatus: note.todoStatus,
+                  // 勾选实时同步
+                  onCheckboxChange: async (isDone: boolean) => {
+                    await this.db.updateNoteCompleteStatus(note.id, isDone)
+                    await this.loadNotes()
+                  }
+                })
+              }
+              .width('100%')
+              .hitTestBehavior(HitTestMode.Transparent)
+              .onClick(() => {
+                this.openEditPage(note.id)
               })
-            }, (note: Note) => note.id + "_" + note.isTodo) // Key 包含状态，确保样式刷新
+            }, (note: NoteCardViewData) => note.id + "_" + note.todoStatus)
           }
         }
         .width('100%')
         .alignItems(HorizontalAlign.Start)
-
       }
-      .width('100%')
-      .alignItems(HorizontalAlign.Start)
       .padding(UiConstants.PAGE_PADDING)
     }
     .scrollBar(BarState.Off)
-    .width('100%')
-    .height('100%')
     .backgroundColor(UiPalette.PAGE_BACKGROUND)
   }
 }
