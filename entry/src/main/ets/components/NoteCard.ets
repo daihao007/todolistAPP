@@ -61,15 +61,17 @@ export struct NoteCard {
     Column({ space: UiConstants.CONTENT_SPACING }) {
       Row() {
         // --- C 同学保留：交互 Checkbox ---
-        Checkbox({ name: 'noteCheck', group: 'notes' })
-          .select(this.todoStatus === TodoVisualStatus.COMPLETED)
-          .selectedColor(UiPalette.SUCCESS)
-          .width(20)
-          .height(20)
-          .margin({ right: 12, top: 2 })
-          .onChange((value: boolean) => {
-            this.dispatchStatusChange(value ? TodoVisualStatus.COMPLETED : TodoVisualStatus.PENDING)
-          })
+        if (this.todoStatus !== TodoVisualStatus.NONE) {
+          Checkbox({ name: 'noteCheck', group: 'notes' })
+            .select(this.todoStatus === TodoVisualStatus.COMPLETED)
+            .selectedColor(UiPalette.SUCCESS)
+            .width(20)
+            .height(20)
+            .margin({ right: 12, top: 2 })
+            .onChange((value: boolean) => {
+              this.dispatchStatusChange(value ? TodoVisualStatus.COMPLETED : TodoVisualStatus.PENDING)
+            })
+        }
 
         Column({ space: 8 }) {
           /* 标题：保留删除线逻辑 */
@@ -95,32 +97,36 @@ export struct NoteCard {
         .alignItems(HorizontalAlign.Start)
 
         // 右上角状态胶囊：采用 B 同学微调后的内边距
-        Text(this.todoStatus)
-          .fontSize(UiConstants.CAPTION_SIZE)
-          .fontColor(this.getStatusTextColor())
-          .padding({ left: 10, right: 10, top: 6, bottom: 6 })
-          .backgroundColor(this.getStatusBackgroundColor())
-          .borderRadius(UiConstants.CHIP_RADIUS)
-          .margin({ left: 12 })
+        if (this.todoStatus !== TodoVisualStatus.NONE) {
+          Text(this.todoStatus)
+            .fontSize(UiConstants.CAPTION_SIZE)
+            .fontColor(this.getStatusTextColor())
+            .padding({ left: 10, right: 10, top: 6, bottom: 6 })
+            .backgroundColor(this.getStatusBackgroundColor())
+            .borderRadius(UiConstants.CHIP_RADIUS)
+            .margin({ left: 12 })
+        }
       }
       .width('100%')
       .alignItems(VerticalAlign.Top)
 
-      Row({ space: 8 }) {
-        ForEach(this.getStatusOptions(), (status: TodoVisualStatus) => {
-          Text(status)
-            .fontSize(UiConstants.CAPTION_SIZE)
-            .fontWeight(this.todoStatus === status ? FontWeight.Medium : FontWeight.Regular)
-            .fontColor(this.todoStatus === status ? this.getStatusTextColor() : UiPalette.TEXT_SECONDARY)
-            .padding({ left: 10, right: 10, top: 6, bottom: 6 })
-            .backgroundColor(this.todoStatus === status ? this.getStatusBackgroundColor() : UiPalette.SURFACE_MUTED)
-            .borderRadius(UiConstants.CHIP_RADIUS)
-            .onClick(() => {
-              this.dispatchStatusChange(status)
-            })
-        }, (status: TodoVisualStatus) => status)
+      if (this.todoStatus !== TodoVisualStatus.NONE) {
+        Row({ space: 8 }) {
+          ForEach(this.getStatusOptions(), (status: TodoVisualStatus) => {
+            Text(status)
+              .fontSize(UiConstants.CAPTION_SIZE)
+              .fontWeight(this.todoStatus === status ? FontWeight.Medium : FontWeight.Regular)
+              .fontColor(this.todoStatus === status ? this.getStatusTextColor() : UiPalette.TEXT_SECONDARY)
+              .padding({ left: 10, right: 10, top: 6, bottom: 6 })
+              .backgroundColor(this.todoStatus === status ? this.getStatusBackgroundColor() : UiPalette.SURFACE_MUTED)
+              .borderRadius(UiConstants.CHIP_RADIUS)
+              .onClick(() => {
+                this.dispatchStatusChange(status)
+              })
+          }, (status: TodoVisualStatus) => status)
+        }
+        .width('100%')
       }
-      .width('100%')
 
       // --- B 同学贡献：真实的图片展示组件 ---
       if (this.imagePath.length > 0) {

@@ -21,7 +21,7 @@ class TagOption {
 
 @Entry
 @Component
-export struct NoteEditPage {
+export struct TodoDetailPage {
   @State titleText: string = ''
   @State contentText: string = ''
   @State imagePath: string = ''
@@ -95,7 +95,7 @@ export struct NoteEditPage {
     } catch (error) {
       this.showError = true
       this.helperText = '加载失败，请稍后再试。'
-      Logger.error('NoteEditPage', `Failed to load note detail: ${JSON.stringify(error)}`)
+      Logger.error('TodoDetailPage', `Failed to load note detail: ${JSON.stringify(error)}`)
     } finally {
       this.loading = false
     }
@@ -145,7 +145,7 @@ export struct NoteEditPage {
     } catch (error) {
       this.showError = true
       this.helperText = '选择图片失败，请稍后再试。'
-      Logger.error('NoteEditPage', `Failed to pick image: ${JSON.stringify(error)}`)
+      Logger.error('TodoDetailPage', `Failed to pick image: ${JSON.stringify(error)}`)
     }
   }
 
@@ -186,7 +186,7 @@ export struct NoteEditPage {
     } catch (error) {
       this.showError = true
       this.helperText = '保存失败，请稍后重试。'
-      Logger.error('NoteEditPage', `Failed to save note: ${JSON.stringify(error)}`)
+      Logger.error('TodoDetailPage', `Failed to save note: ${JSON.stringify(error)}`)
     } finally {
       this.saving = false
     }
@@ -376,7 +376,7 @@ export struct NoteEditPage {
           .backgroundColor(UiPalette.SURFACE)
           .borderRadius(UiConstants.CARD_RADIUS)
 
-          Button(this.saving ? '正在保存...' : '保存待办事项')
+          Button(this.saving ? '正在保存...' : '保存待办')
             .width('100%')
             .height(52)
             .fontSize(UiConstants.BODY_SIZE)
