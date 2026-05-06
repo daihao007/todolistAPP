@@ -1,5 +1,5 @@
 import common from '@ohos.app.ability.common'
-import { CommonConstants, TodoVisualStatus } from '../common/Constants'
+import { TodoVisualStatus } from '../common/Constants'
 import { RdbStoreManager } from '../database/RdbStoreManager'
 import { Note } from '../model/Note'
 import { Logger } from '../utils/Logger'
@@ -103,18 +103,24 @@ export class NoteService {
   }
 
   private tagsToText(tags: string[]): string {
-    return tags
+    const normalizedTags: string[] = []
+    tags
       .map((tag: string) => tag.trim())
-      .filter((tag: string) => CommonConstants.DEFAULT_TAGS.indexOf(tag) >= 0)
-      .join(',')
+      .filter((tag: string) => tag.length > 0)
+      .forEach((tag: string) => {
+        if (normalizedTags.indexOf(tag) < 0) {
+          normalizedTags.push(tag)
+        }
+      })
+    return normalizedTags.join(',')
   }
 
   private toIsTodo(todoStatus: TodoVisualStatus): number {
     switch (todoStatus) {
-      case TodoVisualStatus.PENDING:
-        return 1
       case TodoVisualStatus.COMPLETED:
         return 0
+      case TodoVisualStatus.PENDING:
+        return 1
       case TodoVisualStatus.DEFERRED:
         return 2
       case TodoVisualStatus.NONE:

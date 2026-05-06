@@ -41,7 +41,7 @@ export class NoteViewModel {
         DateUtil.formatDate(note.createTime),
         note.imagePath,
         this.noteService.parseTags(note.tags),
-        note.isTodo === -1 ? TodoVisualStatus.NONE : (note.isTodo === 1 ? TodoVisualStatus.PENDING : TodoVisualStatus.COMPLETED)
+        this.noteService.normalizeTodoStatus(note.todoStatus)
       )
     })
   }
