@@ -9,6 +9,7 @@ import {
 } from '../common/Constants'
 import { CommonEmptyView } from '../components/CommonEmptyView'
 import { NoteCard } from '../components/NoteCard'
+import { TagChip } from '../components/TagChip'
 import { RdbStoreManager } from '../database/RdbStoreManager'
 import { Note } from '../model/Note'
 import { NoteCardViewData, NoteViewModel } from '../viewmodel/NoteViewModel'
@@ -19,6 +20,9 @@ struct Index {
   @State noteList: NoteCardViewData[] = []
   @State loading: boolean = true
   @State helperText: string = ''
+  @State selectedTags: string[] = []
+  @State filterTags: string[] = ['全部'].concat(CommonConstants.DEFAULT_TAGS)
+  @State totalNoteCount: number = 0
 
   private noteViewModel: NoteViewModel | null = null
   private db: RdbStoreManager = RdbStoreManager.getInstance(getContext(this) as common.Context)
@@ -57,7 +61,9 @@ struct Index {
     this.loading = true
     try {
       // 确保在查询前 DB 是初始化的（ViewModel 内部通常也会处理，但这里双重保险）
-      this.noteList = await this.noteViewModel.loadNotes()
+      const allNotes = await this.noteViewModel.loadNotes()
+      this.totalNoteCount = allNotes.length
+      this.noteList = this.filterNotesByTag(allNotes)
       this.helperText = ''
     } catch (error) {
       this.noteList = []
@@ -65,6 +71,33 @@ struct Index {
     } finally {
       this.loading = false
     }
+  }
+
+  private filterNotesByTag(notes: NoteCardViewData[]): NoteCardViewData[] {
+    if (this.selectedTags.length === 0) {
+      return notes
+    }
+    return notes.filter((note: NoteCardViewData) => {
+      return note.tags.some((tag: string) => this.selectedTags.indexOf(tag) >= 0)
+    })
+  }
+
+  private toggleTagFilter(tag: string): void {
+    if (tag === '全部') {
+      this.selectedTags = []
+      void this.loadNotes()
+      return
+    }
+    if (this.selectedTags.indexOf(tag) >= 0) {
+      this.selectedTags = this.selectedTags.filter((item: string) => item !== tag)
+    } else {
+      this.selectedTags = [...this.selectedTags, tag]
+    }
+    void this.loadNotes()
+  }
+
+  private isTagFilterSelected(tag: string): boolean {
+    return tag === '全部' ? this.selectedTags.length === 0 : this.selectedTags.indexOf(tag) >= 0
   }
 
   /**
@@ -93,6 +126,16 @@ struct Index {
           createTime: ts,
           isTodo: 0,
           todoStatus: TodoVisualStatus.COMPLETED
+        },
+        {
+          id: 'test_' + ts + '_3',
+          title: '延期整理课堂资料',
+          content: '用于验证待办状态机中的已延期状态',
+          imagePath: '',
+          tags: '学习',
+          createTime: ts,
+          isTodo: 1,
+          todoStatus: TodoVisualStatus.DEFERRED
         }
       ]
       // 这里的 await 保证了数据写完才刷新 UI
@@ -152,6 +195,44 @@ struct Index {
             .onClick(() => router.pushUrl({ url: CommonConstants.PAGE_SEARCH }))
         }.width('100%')
 
+        Column({ space: 10 }) {
+          Row() {
+            Text('标签归类')
+              .fontSize(UiConstants.SUBTITLE_SIZE)
+              .fontWeight(FontWeight.Medium)
+              .fontColor(UiPalette.TEXT_PRIMARY)
+
+            Text(`${this.noteList.length}/${this.totalNoteCount}`)
+              .fontSize(UiConstants.CAPTION_SIZE)
+              .fontColor(UiPalette.TEXT_MUTED)
+          }
+          .width('100%')
+          .justifyContent(FlexAlign.SpaceBetween)
+
+          Scroll() {
+            Row({ space: 8 }) {
+              ForEach(this.filterTags, (tag: string) => {
+                Row() {
+                  TagChip({
+                    label: tag,
+                    selected: this.isTagFilterSelected(tag),
+                    fillColor: UiPalette.SURFACE_MUTED,
+                    textColor: tag === '全部' ? UiPalette.PRIMARY : UiPalette.TEXT_PRIMARY
+                  })
+                }
+                .onClick(() => {
+                  this.toggleTagFilter(tag)
+                })
+              }, (tag: string) => tag)
+            }
+          }
+          .width('100%')
+          .scrollable(ScrollDirection.Horizontal)
+          .scrollBar(BarState.Off)
+        }
+        .alignItems(HorizontalAlign.Start)
+        .width('100%')
+
         // ==========================================
         // 列表展示区
         // ==========================================
@@ -161,7 +242,7 @@ struct Index {
           if (this.loading) {
             CommonEmptyView({ title: '加载中...', description: '正在从本地数据库同步内容' })
           } else if (this.noteList.length === 0) {
-            CommonEmptyView({ title: '无笔记', description: '点击注入数据或新建笔记开始记录吧' })
+            CommonEmptyView({ title: '无笔记', description: this.selectedTags.length === 0 ? '点击注入数据或新建笔记开始记录吧' : '当前标签组合下暂无笔记' })
           } else {
             ForEach(this.noteList, (note: NoteCardViewData) => {
               Column() {
@@ -172,9 +253,12 @@ struct Index {
                   imagePath: note.imagePath,
                   tags: note.tags,
                   todoStatus: note.todoStatus,
-                  // 勾选实时同步
                   onCheckboxChange: async (isDone: boolean) => {
                     await this.db.updateNoteCompleteStatus(note.id, isDone)
+                    await this.loadNotes()
+                  },
+                  onTodoStatusChange: async (status: TodoVisualStatus) => {
+                    await this.db.updateNoteTodoStatus(note.id, status)
                     await this.loadNotes()
                   }
                 })
