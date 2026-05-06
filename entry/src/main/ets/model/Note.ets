@@ -2,6 +2,7 @@ import { TodoVisualStatus } from '../common/Constants'
 
 export interface Note {
   id: string
+  userId?: string
   title: string
   content: string
   imagePath: string

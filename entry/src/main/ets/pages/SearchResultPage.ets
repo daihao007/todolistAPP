@@ -151,8 +151,8 @@ export struct SearchResultPage {
                 content: note.content,
                 dateText: new Date(note.createTime).toLocaleDateString(),
                 tags: note.tags ? note.tags.split(',') : [],
-                // 1 是 PENDING, 0 是 COMPLETED
-                todoStatus: note.isTodo === 1 ? TodoVisualStatus.PENDING : TodoVisualStatus.COMPLETED,
+                // 根据 isTodo 字段判断显示状态（兼容原本的数据）
+                todoStatus: note.isTodo === -1 ? TodoVisualStatus.NONE : (note.isTodo === 1 ? TodoVisualStatus.PENDING : TodoVisualStatus.COMPLETED),
                 imagePath: note.imagePath,
                 // 这里是核心：将勾选动作回调给 handleToggleStatus
                 onCheckboxChange: (isDone: boolean) => {

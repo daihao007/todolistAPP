@@ -23,7 +23,9 @@ export class UserViewModel {
 
     // 2. 存储账号密码
     await PreferenceUtil.putString(context, user, pass);
+    await PreferenceUtil.putString(context, 'CURRENT_USER', user);
     promptAction.showToast({ message: '注册成功！' });
+    router.replaceUrl({ url: 'pages/Index' });
     return true;
   }
 
@@ -40,6 +42,8 @@ export class UserViewModel {
     } else if (savedPass !== pass) {
       promptAction.showToast({ message: '密码错误' });
     } else {
+      // ✅ 记录当前登录用户
+      await PreferenceUtil.putString(context, 'CURRENT_USER', user);
       promptAction.showToast({ message: '登录成功，欢迎回来' });
       // ✅ 跳转首页并销毁登录页
       router.replaceUrl({ url: 'pages/Index' });

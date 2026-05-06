@@ -42,17 +42,19 @@ export struct NoteCard {
     Column({ space: UiConstants.CONTENT_SPACING }) {
       Row() {
         // --- C 同学保留：交互 Checkbox ---
-        Checkbox({ name: 'noteCheck', group: 'notes' })
-          .select(this.todoStatus === TodoVisualStatus.COMPLETED)
-          .selectedColor(UiPalette.SUCCESS)
-          .width(20)
-          .height(20)
-          .margin({ right: 12, top: 2 })
-          .onChange((value: boolean) => {
-            if (this.onCheckboxChange) {
-              this.onCheckboxChange(value)
-            }
-          })
+        if (this.todoStatus !== TodoVisualStatus.NONE) {
+          Checkbox({ name: 'noteCheck', group: 'notes' })
+            .select(this.todoStatus === TodoVisualStatus.COMPLETED)
+            .selectedColor(UiPalette.SUCCESS)
+            .width(20)
+            .height(20)
+            .margin({ right: 12, top: 2 })
+            .onChange((value: boolean) => {
+              if (this.onCheckboxChange) {
+                this.onCheckboxChange(value)
+              }
+            })
+        }
 
         Column({ space: 8 }) {
           /* 标题：保留删除线逻辑 */
@@ -78,13 +80,15 @@ export struct NoteCard {
         .alignItems(HorizontalAlign.Start)
 
         // 右上角状态胶囊：采用 B 同学微调后的内边距
-        Text(this.todoStatus)
-          .fontSize(UiConstants.CAPTION_SIZE)
-          .fontColor(this.getStatusTextColor())
-          .padding({ left: 10, right: 10, top: 6, bottom: 6 })
-          .backgroundColor(this.getStatusBackgroundColor())
-          .borderRadius(UiConstants.CHIP_RADIUS)
-          .margin({ left: 12 })
+        if (this.todoStatus !== TodoVisualStatus.NONE) {
+          Text(this.todoStatus)
+            .fontSize(UiConstants.CAPTION_SIZE)
+            .fontColor(this.getStatusTextColor())
+            .padding({ left: 10, right: 10, top: 6, bottom: 6 })
+            .backgroundColor(this.getStatusBackgroundColor())
+            .borderRadius(UiConstants.CHIP_RADIUS)
+            .margin({ left: 12 })
+        }
       }
       .width('100%')
       .alignItems(VerticalAlign.Top)
