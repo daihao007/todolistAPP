@@ -3,6 +3,7 @@ import { CommonConstants, TodoVisualStatus } from '../common/Constants'
 import { RdbStoreManager } from '../database/RdbStoreManager'
 import { Note } from '../model/Note'
 import { Logger } from '../utils/Logger'
+import { PreferenceUtil } from '../utils/PreferenceUtil'
 
 export interface NoteEditorInput {
   title: string
@@ -14,15 +15,23 @@ export interface NoteEditorInput {
 
 export class NoteService {
   private readonly rdbStoreManager: RdbStoreManager
+  private readonly context: common.Context
 
   constructor(context: common.Context) {
+    this.context = context
     this.rdbStoreManager = RdbStoreManager.getInstance(context)
+  }
+
+  async getCurrentUser(): Promise<string> {
+    return await PreferenceUtil.getString(this.context, 'CURRENT_USER', '')
   }
 
   async createNote(input: NoteEditorInput): Promise<Note> {
     const timestamp = Date.now()
+    const currentUserId = await this.getCurrentUser()
     const note: Note = {
       id: this.generateNoteId(timestamp),
+      userId: currentUserId,
       title: input.title.trim(),
       content: input.content.trim(),
       imagePath: input.imagePath,
@@ -42,8 +51,11 @@ export class NoteService {
       throw new Error(`Note ${noteId} does not exist`)
     }
 
+    const currentUserId = await this.getCurrentUser()
+
     const nextNote: Note = {
       id: current.id,
+      userId: currentUserId || current.userId,
       title: input.title.trim(),
       content: input.content.trim(),
       imagePath: input.imagePath,
@@ -63,7 +75,8 @@ export class NoteService {
   }
 
   async getAllNotes(): Promise<Note[]> {
-    return this.rdbStoreManager.queryAllNotes()
+    const currentUserId = await this.getCurrentUser()
+    return this.rdbStoreManager.queryAllNotes(currentUserId)
   }
 
   parseTags(tagsText: string): string[] {
@@ -82,8 +95,10 @@ export class NoteService {
         return TodoVisualStatus.COMPLETED
       case TodoVisualStatus.DEFERRED:
         return TodoVisualStatus.DEFERRED
-      default:
+      case TodoVisualStatus.PENDING:
         return TodoVisualStatus.PENDING
+      default:
+        return TodoVisualStatus.NONE
     }
   }
 
@@ -97,11 +112,14 @@ export class NoteService {
   private toIsTodo(todoStatus: TodoVisualStatus): number {
     switch (todoStatus) {
       case TodoVisualStatus.PENDING:
-      case TodoVisualStatus.COMPLETED:
-      case TodoVisualStatus.DEFERRED:
         return 1
-      default:
+      case TodoVisualStatus.COMPLETED:
         return 0
+      case TodoVisualStatus.DEFERRED:
+        return 2
+      case TodoVisualStatus.NONE:
+      default:
+        return -1
     }
   }
 

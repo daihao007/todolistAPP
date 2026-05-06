@@ -36,6 +36,7 @@ export class RdbStoreManager {
 
     const sqlNotes = `CREATE TABLE IF NOT EXISTS ${CommonConstants.TABLE_NOTES} (
       id TEXT PRIMARY KEY,
+      userId TEXT,
       title TEXT,
       content TEXT,
       imagePath TEXT,
@@ -71,6 +72,7 @@ export class RdbStoreManager {
     if (!this.store) return;
     const valueBucket: relationalStore.ValuesBucket = {
       'id': note.id,
+      'userId': note.userId || '',
       'title': note.title,
       'content': note.content,
       'imagePath': note.imagePath,
@@ -114,9 +116,12 @@ export class RdbStoreManager {
   /**
    * 查询所有笔记
    */
-  async queryAllNotes(): Promise<Note[]> {
+  async queryAllNotes(userId?: string): Promise<Note[]> {
     if (!this.store) return [];
     let predicates = new relationalStore.RdbPredicates(CommonConstants.TABLE_NOTES);
+    if (userId) {
+      predicates.equalTo('userId', userId);
+    }
     predicates.orderByDesc('createTime');
     let resultSet = await this.store.query(predicates);
     return this.mapResultSetToNotes(resultSet);
@@ -125,11 +130,18 @@ export class RdbStoreManager {
   /**
    * 搜索笔记
    */
-  async searchNotes(keyword: string): Promise<Note[]> {
+  async searchNotes(keyword: string, userId?: string): Promise<Note[]> {
     if (!this.store) return [];
     let predicates = new relationalStore.RdbPredicates(CommonConstants.TABLE_NOTES);
-    if (keyword.trim()) {
-      predicates.contains('title', keyword).or().contains('content', keyword);
+    if (userId) {
+      predicates.equalTo('userId', userId);
+      if (keyword.trim()) {
+        predicates.and().beginWrap().contains('title', keyword).or().contains('content', keyword).endWrap();
+      }
+    } else {
+      if (keyword.trim()) {
+        predicates.contains('title', keyword).or().contains('content', keyword);
+      }
     }
     predicates.orderByDesc('createTime');
     let resultSet = await this.store.query(predicates);
@@ -156,8 +168,16 @@ export class RdbStoreManager {
     let result: Note[] = [];
     while (resultSet.goToNextRow()) {
       const isTodoVal = resultSet.getLong(resultSet.getColumnIndex('isTodo'));
+      
+      // 注意：如果有的记录在修改表之前插入的，可能没用到 userId，处理一下异常
+      let uId = '';
+      try {
+        uId = resultSet.getString(resultSet.getColumnIndex('userId'));
+      } catch (e) {}
+
       result.push({
         id: resultSet.getString(resultSet.getColumnIndex('id')),
+        userId: uId,
         title: resultSet.getString(resultSet.getColumnIndex('title')),
         content: resultSet.getString(resultSet.getColumnIndex('content')),
         imagePath: resultSet.getString(resultSet.getColumnIndex('imagePath')),
