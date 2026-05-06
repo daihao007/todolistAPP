@@ -8,7 +8,7 @@ export interface Note {
   tags: string
   createTime: number
   isTodo: number
-  todoStatus: string
+  todoStatus: TodoVisualStatus
 }
 
 export const MockNotes: Note[] = [
