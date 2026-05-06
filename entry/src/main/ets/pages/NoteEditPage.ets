@@ -26,7 +26,7 @@ export struct NoteEditPage {
   @State contentText: string = ''
   @State imagePath: string = ''
   @State selectedTags: string[] = []
-  @State todoStatus: TodoVisualStatus = TodoVisualStatus.PENDING
+  @State todoStatus: TodoVisualStatus = TodoVisualStatus.NONE
   @State helperText: string = ''
   @State showError: boolean = false
   @State loading: boolean = true
@@ -242,7 +242,7 @@ export struct NoteEditPage {
             .fontWeight(FontWeight.Bold)
             .fontColor(UiPalette.TEXT_PRIMARY)
 
-          Text('支持标题、正文、图片、标签和待办状态。保存成功后会返回首页并自动刷新列表。')
+          Text('支持标题、正文、图片、标签。保存成功后会返回首页并自动刷新列表。')
             .fontSize(UiConstants.BODY_SIZE)
             .fontColor(UiPalette.TEXT_SECONDARY)
             .lineHeight(22)
@@ -460,20 +460,6 @@ export struct NoteEditPage {
                 .fontSize(UiConstants.CAPTION_SIZE)
                 .fontColor(UiPalette.TEXT_SECONDARY)
             }
-          }
-          .alignItems(HorizontalAlign.Start)
-          .width('100%')
-          .padding(16)
-          .backgroundColor(UiPalette.SURFACE)
-          .borderRadius(UiConstants.CARD_RADIUS)
-
-          Column({ space: 10 }) {
-            Text('待办状态')
-              .fontSize(UiConstants.SUBTITLE_SIZE)
-              .fontWeight(FontWeight.Medium)
-              .fontColor(UiPalette.TEXT_PRIMARY)
-
-            TodoStatusSwitch({ currentStatus: $todoStatus })
           }
           .alignItems(HorizontalAlign.Start)
           .width('100%')

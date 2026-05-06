@@ -20,6 +20,7 @@ export class CommonConstants {
 }
 
 export enum TodoVisualStatus {
+  NONE = '无状态',
   PENDING = '待处理',
   COMPLETED = '已完成',
   DEFERRED = '已延期'

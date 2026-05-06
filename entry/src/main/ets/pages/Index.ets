@@ -4,45 +4,84 @@ import {
   CommonConstants,
   TodoVisualStatus,
   UiConstants,
-  UiCopywriting,
   UiPalette
 } from '../common/Constants'
-import { CommonEmptyView } from '../components/CommonEmptyView'
+import { RdbStoreManager } from '../database/RdbStoreManager'
+import { NoteViewModel, NoteCardViewData } from '../viewmodel/NoteViewModel'
 import { NoteCard } from '../components/NoteCard'
 import { TagChip } from '../components/TagChip'
-import { RdbStoreManager } from '../database/RdbStoreManager'
-import { Note } from '../model/Note'
-import { NoteCardViewData, NoteViewModel } from '../viewmodel/NoteViewModel'
+
+@Component
+struct DatePickerButton {
+  placeholder: string = ''
+  minDate?: string
+  @Link dateValue: string
+
+  build() {
+    Row() {
+      Text(this.dateValue ? this.dateValue : this.placeholder)
+        .fontColor(this.dateValue ? UiPalette.TEXT_PRIMARY : '#999')
+        .fontSize(UiConstants.BODY_SIZE)
+    }
+    .layoutWeight(1)
+    .height(44)
+    .padding({ left: 14, right: 14 })
+    .backgroundColor(UiPalette.SURFACE)
+    .borderRadius(14)
+    .onClick(() => {
+      let selectedDate = this.dateValue ? new Date(this.dateValue) : new Date()
+      let startDate = this.minDate ? new Date(this.minDate) : new Date('2020-01-01')
+      if (selectedDate.getTime() < startDate.getTime()) {
+        selectedDate = startDate
+      }
+
+      DatePickerDialog.show({
+        start: startDate,
+        end: new Date('2050-12-31'),
+        selected: selectedDate,
+        onAccept: (value: DatePickerResult) => {
+          let m = (value.month! + 1).toString().padStart(2, '0')
+          let d = value.day!.toString().padStart(2, '0')
+          this.dateValue = `${value.year}-${m}-${d}`
+        }
+      })
+    })
+  }
+}
 
 @Entry
 @Component
 struct Index {
   @State noteList: NoteCardViewData[] = []
   @State loading: boolean = true
-  @State helperText: string = ''
+  @State username: string = '开发者'
+  @State currentIndex: number = 0
+  @State noteKeyword: string = ''
+  @State noteStartDate: string = ''
+  @State noteEndDate: string = ''
+  @State todoKeyword: string = ''
+  @State todoStartDate: string = ''
+  @State todoEndDate: string = ''
   @State selectedTags: string[] = []
   @State filterTags: string[] = ['全部'].concat(CommonConstants.DEFAULT_TAGS)
-  @State totalNoteCount: number = 0
 
   private noteViewModel: NoteViewModel | null = null
   private db: RdbStoreManager = RdbStoreManager.getInstance(getContext(this) as common.Context)
 
-  // ✅ 核心修复点 1：使用 async/await 确保初始化顺序
   async aboutToAppear() {
     this.ensureViewModel()
     try {
-      // 必须先等数据库初始化完成
       await this.db.initDb()
-      // 数据库就绪后再加载笔记
       await this.loadNotes()
     } catch (err) {
-      console.error('C_LOG: 初始化失败', JSON.stringify(err))
+      console.error('E_Log: 初始化失败')
     }
   }
 
-  // ✅ 核心修复点 2：页面展示时（如从编辑页回来）自动刷新
   onPageShow(): void {
-    void this.loadNotes()
+    this.loadNotes().catch((err: Error) => {
+      console.error('E_Log: 刷新失败 ' + err.message)
+    })
   }
 
   private ensureViewModel(): void {
@@ -51,41 +90,57 @@ struct Index {
     this.noteViewModel = new NoteViewModel(context)
   }
 
-  /**
-   * 加载数据
-   */
   private async loadNotes(): Promise<void> {
     this.ensureViewModel()
     if (this.noteViewModel === null) return
-
     this.loading = true
     try {
-      // 确保在查询前 DB 是初始化的（ViewModel 内部通常也会处理，但这里双重保险）
-      const allNotes = await this.noteViewModel.loadNotes()
-      this.totalNoteCount = allNotes.length
-      this.noteList = this.filterNotesByTag(allNotes)
-      this.helperText = ''
-    } catch (error) {
-      this.noteList = []
-      this.helperText = '获取笔记失败'
+      this.noteList = await this.noteViewModel.loadNotes()
     } finally {
       this.loading = false
     }
   }
 
-  private filterNotesByTag(notes: NoteCardViewData[]): NoteCardViewData[] {
-    if (this.selectedTags.length === 0) {
-      return notes
+  private async handleToggleStatus(noteId: string, isDone: boolean): Promise<void> {
+    await this.db.updateNoteCompleteStatus(noteId, isDone)
+    await this.loadNotes()
+  }
+
+  private async handleStatusChange(noteId: string, status: TodoVisualStatus): Promise<void> {
+    await this.db.updateNoteTodoStatus(noteId, status)
+    await this.loadNotes()
+  }
+
+  private filterItems(isTodo: boolean): NoteCardViewData[] {
+    let filtered = this.noteList.filter((note: NoteCardViewData) =>
+      isTodo ? note.todoStatus !== TodoVisualStatus.NONE : note.todoStatus === TodoVisualStatus.NONE
+    )
+
+    const keyword = isTodo ? this.todoKeyword : this.noteKeyword
+    const startDate = isTodo ? this.todoStartDate : this.noteStartDate
+    const endDate = isTodo ? this.todoEndDate : this.noteEndDate
+
+    if (keyword.length > 0) {
+      filtered = filtered.filter((note: NoteCardViewData) => note.title.includes(keyword) || note.content.includes(keyword))
     }
-    return notes.filter((note: NoteCardViewData) => {
-      return note.tags.some((tag: string) => this.selectedTags.indexOf(tag) >= 0)
-    })
+    if (startDate.length > 0) {
+      filtered = filtered.filter((note: NoteCardViewData) => note.dateText >= startDate)
+    }
+    if (endDate.length > 0) {
+      filtered = filtered.filter((note: NoteCardViewData) => note.dateText <= endDate)
+    }
+    if (this.selectedTags.length > 0) {
+      filtered = filtered.filter((note: NoteCardViewData) => {
+        return note.tags.some((tag: string) => this.selectedTags.indexOf(tag) >= 0)
+      })
+    }
+
+    return filtered
   }
 
   private toggleTagFilter(tag: string): void {
     if (tag === '全部') {
       this.selectedTags = []
-      void this.loadNotes()
       return
     }
     if (this.selectedTags.indexOf(tag) >= 0) {
@@ -93,190 +148,274 @@ struct Index {
     } else {
       this.selectedTags = [...this.selectedTags, tag]
     }
-    void this.loadNotes()
   }
 
   private isTagFilterSelected(tag: string): boolean {
     return tag === '全部' ? this.selectedTags.length === 0 : this.selectedTags.indexOf(tag) >= 0
   }
 
-  /**
-   * 实验室造数据
-   */
-  private async seedTestData() {
-    try {
-      const ts = Date.now();
-      const testNotes: Note[] = [
-        {
-          id: 'test_' + ts + '_1',
-          title: '周一开会 (待办)',
-          content: '点击勾选试试删除线效果',
-          imagePath: '',
-          tags: '工作',
-          createTime: ts,
-          isTodo: 1,
-          todoStatus: TodoVisualStatus.PENDING
-        },
-        {
-          id: 'test_' + ts + '_2',
-          title: '已完成事项',
-          content: '这是一条已经带删除线的笔记',
-          imagePath: '',
-          tags: '生活',
-          createTime: ts,
-          isTodo: 0,
-          todoStatus: TodoVisualStatus.COMPLETED
-        },
-        {
-          id: 'test_' + ts + '_3',
-          title: '延期整理课堂资料',
-          content: '用于验证待办状态机中的已延期状态',
-          imagePath: '',
-          tags: '学习',
-          createTime: ts,
-          isTodo: 1,
-          todoStatus: TodoVisualStatus.DEFERRED
-        }
-      ]
-      // 这里的 await 保证了数据写完才刷新 UI
-      await this.db.initDb()
-      for (let note of testNotes) {
-        await this.db.insertNote(note)
-      }
-      await this.loadNotes()
-      AlertDialog.show({ message: '测试数据注入成功！' })
-    } catch (err) {
-      this.helperText = '注入失败'
+  @Builder TabBuilder(title: string, targetIndex: number, iconRaw: string) {
+    Column() {
+      Text(title)
+        .fontColor(this.currentIndex === targetIndex ? UiPalette.PRIMARY : '#999')
+        .fontSize(16)
+        .fontWeight(this.currentIndex === targetIndex ? FontWeight.Bold : FontWeight.Normal)
+        .margin({ top: 4 })
     }
-  }
-
-  private openCreatePage(): void {
-    router.pushUrl({ url: CommonConstants.PAGE_EDIT })
-  }
-
-  private openEditPage(noteId: string): void {
-    router.pushUrl({
-      url: CommonConstants.PAGE_EDIT,
-      params: { noteId: noteId }
+    .width('100%')
+    .height(50)
+    .justifyContent(FlexAlign.Center)
+    .onClick(() => {
+      this.currentIndex = targetIndex
     })
   }
 
-  build() {
+  @Builder TagFilterBar() {
     Scroll() {
-      Column({ space: UiConstants.SECTION_SPACING }) {
-
-        // ==========================================
-        // 🚀 实验室控制台
-        // ==========================================
-        Column({ space: 10 }) {
-          Text('C 逻辑实验室 - 交互同步版')
-            .fontSize(14).fontColor(Color.White).fontWeight(FontWeight.Medium)
-          Row({ space: 10 }) {
-            Button('注入测试数据').layoutWeight(1).height(36).fontSize(12).backgroundColor(UiPalette.SUCCESS)
-              .onClick(() => this.seedTestData())
-            Button('清空/刷新').layoutWeight(1).height(36).fontSize(12).backgroundColor(UiPalette.PRIMARY)
-              .onClick(() => this.loadNotes())
-          }
-        }
-        .width('100%').padding(15).backgroundColor('#1F2430').borderRadius(UiConstants.CARD_RADIUS)
-
-        // ==========================================
-        // 头部导航
-        // ==========================================
-        Column({ space: 6 }) {
-          Text(UiCopywriting.DESIGN_TITLE).fontSize(28).fontWeight(FontWeight.Bold)
-          Text(UiCopywriting.DESIGN_SUBTITLE).fontSize(UiConstants.BODY_SIZE).fontColor(UiPalette.TEXT_SECONDARY)
-        }.alignItems(HorizontalAlign.Start).width('100%')
-
-        Row({ space: 10 }) {
-          Button('新建笔记').layoutWeight(1).height(46).backgroundColor(UiPalette.PRIMARY)
-            .onClick(() => this.openCreatePage())
-          Button('搜索').layoutWeight(1).height(46).backgroundColor(UiPalette.SURFACE).fontColor(UiPalette.TEXT_PRIMARY)
-            .onClick(() => router.pushUrl({ url: CommonConstants.PAGE_SEARCH }))
-        }.width('100%')
-
-        Column({ space: 10 }) {
+      Row({ space: 8 }) {
+        ForEach(this.filterTags, (tag: string) => {
           Row() {
-            Text('标签归类')
-              .fontSize(UiConstants.SUBTITLE_SIZE)
-              .fontWeight(FontWeight.Medium)
-              .fontColor(UiPalette.TEXT_PRIMARY)
-
-            Text(`${this.noteList.length}/${this.totalNoteCount}`)
-              .fontSize(UiConstants.CAPTION_SIZE)
-              .fontColor(UiPalette.TEXT_MUTED)
+            TagChip({
+              label: tag,
+              selected: this.isTagFilterSelected(tag),
+              fillColor: UiPalette.SURFACE_MUTED,
+              textColor: tag === '全部' ? UiPalette.PRIMARY : UiPalette.TEXT_PRIMARY
+            })
           }
-          .width('100%')
-          .justifyContent(FlexAlign.SpaceBetween)
+          .onClick(() => {
+            this.toggleTagFilter(tag)
+          })
+        }, (tag: string) => tag)
+      }
+    }
+    .width('100%')
+    .scrollable(ScrollDirection.Horizontal)
+    .scrollBar(BarState.Off)
+  }
 
-          Scroll() {
-            Row({ space: 8 }) {
-              ForEach(this.filterTags, (tag: string) => {
-                Row() {
-                  TagChip({
-                    label: tag,
-                    selected: this.isTagFilterSelected(tag),
-                    fillColor: UiPalette.SURFACE_MUTED,
-                    textColor: tag === '全部' ? UiPalette.PRIMARY : UiPalette.TEXT_PRIMARY
+  build() {
+    Tabs({ barPosition: BarPosition.End, index: this.currentIndex }) {
+      TabContent() {
+        Stack({ alignContent: Alignment.BottomEnd }) {
+          Column() {
+            Column() {
+              Text(`你好，${this.username}`).fontSize(28).fontWeight(FontWeight.Bold)
+              Text('让创意随时随地发芽').fontSize(16).fontColor('#666').margin({ top: 8 })
+            }
+            .width('100%').alignItems(HorizontalAlign.Start).padding({ left: UiConstants.PAGE_PADDING, top: 40, bottom: 20 })
+
+            Column({ space: 12 }) {
+              Stack({ alignContent: Alignment.End }) {
+                TextInput({ placeholder: '输入关键字搜索笔记...', text: this.noteKeyword })
+                  .width('100%')
+                  .height(44)
+                  .fontSize(UiConstants.BODY_SIZE)
+                  .backgroundColor(UiPalette.SURFACE)
+                  .borderRadius(14)
+                  .padding({ left: 14, right: 40 })
+                  .onChange((value: string) => {
+                    this.noteKeyword = value
+                  })
+                if (this.noteKeyword.length > 0) {
+                  Text('x')
+                    .fontSize(16)
+                    .fontColor(UiPalette.TEXT_SECONDARY)
+                    .margin({ right: 14 })
+                    .onClick(() => {
+                      this.noteKeyword = ''
+                    })
+                }
+              }
+
+              Row({ space: 10 }) {
+                DatePickerButton({
+                  placeholder: '开始日期',
+                  dateValue: $noteStartDate
+                })
+                if (this.noteStartDate.length > 0) {
+                  Text('x')
+                    .fontSize(14)
+                    .fontColor(UiPalette.TEXT_SECONDARY)
+                    .onClick(() => {
+                      this.noteStartDate = ''
+                    })
+                }
+
+                DatePickerButton({
+                  placeholder: '结束日期',
+                  minDate: this.noteStartDate,
+                  dateValue: $noteEndDate
+                })
+                if (this.noteEndDate.length > 0) {
+                  Text('x')
+                    .fontSize(14)
+                    .fontColor(UiPalette.TEXT_SECONDARY)
+                    .onClick(() => {
+                      this.noteEndDate = ''
+                    })
+                }
+              }
+              .width('100%')
+              .alignItems(VerticalAlign.Center)
+
+              this.TagFilterBar()
+            }
+            .padding({ left: UiConstants.PAGE_PADDING, right: UiConstants.PAGE_PADDING, bottom: 12 })
+
+            List({ space: 12 }) {
+              ForEach(this.filterItems(false), (note: NoteCardViewData) => {
+                ListItem() {
+                  NoteCard({
+                    title: note.title,
+                    content: note.content,
+                    dateText: note.dateText,
+                    tags: note.tags,
+                    todoStatus: note.todoStatus,
+                    imagePath: note.imagePath
                   })
                 }
                 .onClick(() => {
-                  this.toggleTagFilter(tag)
+                  router.pushUrl({ url: 'pages/NoteEditPage', params: { noteId: note.id } })
                 })
-              }, (tag: string) => tag)
+              }, (note: NoteCardViewData) => note.id)
             }
+            .width('100%')
+            .layoutWeight(1)
+            .padding({ left: UiConstants.PAGE_PADDING, right: UiConstants.PAGE_PADDING, bottom: 80 })
           }
-          .width('100%')
-          .scrollable(ScrollDirection.Horizontal)
-          .scrollBar(BarState.Off)
+          .width('100%').height('100%')
+
+          Button({ type: ButtonType.Circle, stateEffect: true }) {
+            Text('+').fontSize(32).fontColor(Color.White)
+          }
+          .width(60)
+          .height(60)
+          .margin({ right: 20, bottom: 20 })
+          .backgroundColor(UiPalette.PRIMARY)
+          .shadow({ radius: 10, color: UiPalette.PRIMARY_SOFT, offsetY: 5 })
+          .onClick(() => {
+            router.pushUrl({ url: 'pages/NoteEditPage' })
+          })
         }
-        .alignItems(HorizontalAlign.Start)
-        .width('100%')
+        .width('100%').height('100%')
+      }.tabBar(this.TabBuilder('我的笔记', 0, ''))
 
-        // ==========================================
-        // 列表展示区
-        // ==========================================
-        Column({ space: 12 }) {
-          Text('我的笔记').fontSize(UiConstants.TITLE_SIZE).fontWeight(FontWeight.Bold)
+      TabContent() {
+        Stack({ alignContent: Alignment.BottomEnd }) {
+          Column() {
+            Column() {
+              Text('待办清单').fontSize(28).fontWeight(FontWeight.Bold)
+              Text('管理日程，高效每一天').fontSize(16).fontColor('#666').margin({ top: 8 })
+            }
+            .width('100%').alignItems(HorizontalAlign.Start).padding({ left: UiConstants.PAGE_PADDING, top: 40, bottom: 20 })
 
-          if (this.loading) {
-            CommonEmptyView({ title: '加载中...', description: '正在从本地数据库同步内容' })
-          } else if (this.noteList.length === 0) {
-            CommonEmptyView({ title: '无笔记', description: this.selectedTags.length === 0 ? '点击注入数据或新建笔记开始记录吧' : '当前标签组合下暂无笔记' })
-          } else {
-            ForEach(this.noteList, (note: NoteCardViewData) => {
-              Column() {
-                NoteCard({
-                  title: note.title,
-                  content: note.content,
-                  dateText: note.dateText,
-                  imagePath: note.imagePath,
-                  tags: note.tags,
-                  todoStatus: note.todoStatus,
-                  onCheckboxChange: async (isDone: boolean) => {
-                    await this.db.updateNoteCompleteStatus(note.id, isDone)
-                    await this.loadNotes()
-                  },
-                  onTodoStatusChange: async (status: TodoVisualStatus) => {
-                    await this.db.updateNoteTodoStatus(note.id, status)
-                    await this.loadNotes()
-                  }
+            Column({ space: 12 }) {
+              Stack({ alignContent: Alignment.End }) {
+                TextInput({ placeholder: '输入关键字搜索待办...', text: this.todoKeyword })
+                  .width('100%')
+                  .height(44)
+                  .fontSize(UiConstants.BODY_SIZE)
+                  .backgroundColor(UiPalette.SURFACE)
+                  .borderRadius(14)
+                  .padding({ left: 14, right: 40 })
+                  .onChange((value: string) => {
+                    this.todoKeyword = value
+                  })
+                if (this.todoKeyword.length > 0) {
+                  Text('x')
+                    .fontSize(16)
+                    .fontColor(UiPalette.TEXT_SECONDARY)
+                    .margin({ right: 14 })
+                    .onClick(() => {
+                      this.todoKeyword = ''
+                    })
+                }
+              }
+
+              Row({ space: 10 }) {
+                DatePickerButton({
+                  placeholder: '开始日期',
+                  dateValue: $todoStartDate
                 })
+                if (this.todoStartDate.length > 0) {
+                  Text('x')
+                    .fontSize(14)
+                    .fontColor(UiPalette.TEXT_SECONDARY)
+                    .onClick(() => {
+                      this.todoStartDate = ''
+                    })
+                }
+
+                DatePickerButton({
+                  placeholder: '结束日期',
+                  minDate: this.todoStartDate,
+                  dateValue: $todoEndDate
+                })
+                if (this.todoEndDate.length > 0) {
+                  Text('x')
+                    .fontSize(14)
+                    .fontColor(UiPalette.TEXT_SECONDARY)
+                    .onClick(() => {
+                      this.todoEndDate = ''
+                    })
+                }
               }
               .width('100%')
-              .hitTestBehavior(HitTestMode.Transparent)
-              .onClick(() => {
-                this.openEditPage(note.id)
-              })
-            }, (note: NoteCardViewData) => note.id + "_" + note.todoStatus)
+              .alignItems(VerticalAlign.Center)
+
+              this.TagFilterBar()
+            }
+            .padding({ left: UiConstants.PAGE_PADDING, right: UiConstants.PAGE_PADDING, bottom: 12 })
+
+            List({ space: 12 }) {
+              ForEach(this.filterItems(true), (note: NoteCardViewData) => {
+                ListItem() {
+                  NoteCard({
+                    title: note.title,
+                    content: note.content,
+                    dateText: note.dateText,
+                    tags: note.tags,
+                    todoStatus: note.todoStatus,
+                    imagePath: note.imagePath,
+                    onCheckboxChange: (isDone: boolean) => {
+                      void this.handleToggleStatus(note.id, isDone)
+                    },
+                    onTodoStatusChange: (status: TodoVisualStatus) => {
+                      void this.handleStatusChange(note.id, status)
+                    }
+                  })
+                }
+                .onClick(() => {
+                  router.pushUrl({ url: 'pages/TodoDetailPage', params: { noteId: note.id } })
+                })
+              }, (note: NoteCardViewData) => note.id + '_' + note.todoStatus)
+            }
+            .width('100%')
+            .layoutWeight(1)
+            .padding({ left: UiConstants.PAGE_PADDING, right: UiConstants.PAGE_PADDING, bottom: 80 })
           }
+          .width('100%').height('100%')
+
+          Button({ type: ButtonType.Circle, stateEffect: true }) {
+            Text('+').fontSize(32).fontColor(Color.White)
+          }
+          .width(60)
+          .height(60)
+          .margin({ right: 20, bottom: 20 })
+          .backgroundColor(UiPalette.SUCCESS)
+          .shadow({ radius: 10, color: UiPalette.SUCCESS_SOFT, offsetY: 5 })
+          .onClick(() => {
+            router.pushUrl({ url: 'pages/TodoDetailPage' })
+          })
         }
-        .width('100%')
-        .alignItems(HorizontalAlign.Start)
-      }
-      .padding(UiConstants.PAGE_PADDING)
+        .width('100%').height('100%')
+      }.tabBar(this.TabBuilder('待办事项', 1, ''))
     }
-    .scrollBar(BarState.Off)
-    .backgroundColor(UiPalette.PAGE_BACKGROUND)
+    .onChange((index: number) => {
+      this.currentIndex = index
+    })
+    .width('100%')
+    .height('100%')
+    .backgroundColor('#F1F3F5')
   }
 }
