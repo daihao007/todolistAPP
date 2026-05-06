@@ -1,6 +1,7 @@
 import router from '@ohos.router'
 import common from '@ohos.app.ability.common'
 import {
+  CommonConstants,
   TodoVisualStatus,
   UiConstants,
   UiPalette
@@ -8,12 +9,7 @@ import {
 import { RdbStoreManager } from '../database/RdbStoreManager'
 import { NoteViewModel, NoteCardViewData } from '../viewmodel/NoteViewModel'
 import { NoteCard } from '../components/NoteCard'
-
-class DatePickerConfig {
-  placeholder: string = ''
-  dateValue: string = ''
-  onDateSelect: (date: string) => void = () => {}
-}
+import { TagChip } from '../components/TagChip'
 
 @Component
 struct DatePickerButton {
@@ -35,11 +31,10 @@ struct DatePickerButton {
     .onClick(() => {
       let selectedDate = this.dateValue ? new Date(this.dateValue) : new Date()
       let startDate = this.minDate ? new Date(this.minDate) : new Date('2020-01-01')
-      // 确保选中的默认日期不会小于最小日期限制
       if (selectedDate.getTime() < startDate.getTime()) {
         selectedDate = startDate
       }
-      
+
       DatePickerDialog.show({
         start: startDate,
         end: new Date('2050-12-31'),
@@ -67,6 +62,8 @@ struct Index {
   @State todoKeyword: string = ''
   @State todoStartDate: string = ''
   @State todoEndDate: string = ''
+  @State selectedTags: string[] = []
+  @State filterTags: string[] = ['全部'].concat(CommonConstants.DEFAULT_TAGS)
 
   private noteViewModel: NoteViewModel | null = null
   private db: RdbStoreManager = RdbStoreManager.getInstance(getContext(this) as common.Context)
@@ -104,37 +101,61 @@ struct Index {
     }
   }
 
-  async handleToggleStatus(noteId: string, isDone: boolean) {
-    const newStatusValue = isDone ? 0 : 1
+  private async handleToggleStatus(noteId: string, isDone: boolean): Promise<void> {
     await this.db.updateNoteCompleteStatus(noteId, isDone)
     await this.loadNotes()
   }
 
+  private async handleStatusChange(noteId: string, status: TodoVisualStatus): Promise<void> {
+    await this.db.updateNoteTodoStatus(noteId, status)
+    await this.loadNotes()
+  }
+
   private filterItems(isTodo: boolean): NoteCardViewData[] {
-    let filtered = this.noteList.filter(n =>
-      isTodo ? n.todoStatus !== TodoVisualStatus.NONE : n.todoStatus === TodoVisualStatus.NONE
+    let filtered = this.noteList.filter((note: NoteCardViewData) =>
+      isTodo ? note.todoStatus !== TodoVisualStatus.NONE : note.todoStatus === TodoVisualStatus.NONE
     )
 
-    const kw = isTodo ? this.todoKeyword : this.noteKeyword
-    const sd = isTodo ? this.todoStartDate : this.noteStartDate
-    const ed = isTodo ? this.todoEndDate : this.noteEndDate
+    const keyword = isTodo ? this.todoKeyword : this.noteKeyword
+    const startDate = isTodo ? this.todoStartDate : this.noteStartDate
+    const endDate = isTodo ? this.todoEndDate : this.noteEndDate
 
-    if (kw.length > 0) {
-      filtered = filtered.filter(n => n.title.includes(kw) || n.content.includes(kw))
+    if (keyword.length > 0) {
+      filtered = filtered.filter((note: NoteCardViewData) => note.title.includes(keyword) || note.content.includes(keyword))
     }
-    if (sd.length > 0) {
-      filtered = filtered.filter(n => n.dateText >= sd)
+    if (startDate.length > 0) {
+      filtered = filtered.filter((note: NoteCardViewData) => note.dateText >= startDate)
     }
-    if (ed.length > 0) {
-      filtered = filtered.filter(n => n.dateText <= ed)
+    if (endDate.length > 0) {
+      filtered = filtered.filter((note: NoteCardViewData) => note.dateText <= endDate)
+    }
+    if (this.selectedTags.length > 0) {
+      filtered = filtered.filter((note: NoteCardViewData) => {
+        return note.tags.some((tag: string) => this.selectedTags.indexOf(tag) >= 0)
+      })
     }
 
     return filtered
   }
 
+  private toggleTagFilter(tag: string): void {
+    if (tag === '全部') {
+      this.selectedTags = []
+      return
+    }
+    if (this.selectedTags.indexOf(tag) >= 0) {
+      this.selectedTags = this.selectedTags.filter((item: string) => item !== tag)
+    } else {
+      this.selectedTags = [...this.selectedTags, tag]
+    }
+  }
+
+  private isTagFilterSelected(tag: string): boolean {
+    return tag === '全部' ? this.selectedTags.length === 0 : this.selectedTags.indexOf(tag) >= 0
+  }
+
   @Builder TabBuilder(title: string, targetIndex: number, iconRaw: string) {
     Column() {
-      // 简单文本替代复杂图文即可
       Text(title)
         .fontColor(this.currentIndex === targetIndex ? UiPalette.PRIMARY : '#999')
         .fontSize(16)
@@ -149,9 +170,31 @@ struct Index {
     })
   }
 
+  @Builder TagFilterBar() {
+    Scroll() {
+      Row({ space: 8 }) {
+        ForEach(this.filterTags, (tag: string) => {
+          Row() {
+            TagChip({
+              label: tag,
+              selected: this.isTagFilterSelected(tag),
+              fillColor: UiPalette.SURFACE_MUTED,
+              textColor: tag === '全部' ? UiPalette.PRIMARY : UiPalette.TEXT_PRIMARY
+            })
+          }
+          .onClick(() => {
+            this.toggleTagFilter(tag)
+          })
+        }, (tag: string) => tag)
+      }
+    }
+    .width('100%')
+    .scrollable(ScrollDirection.Horizontal)
+    .scrollBar(BarState.Off)
+  }
+
   build() {
     Tabs({ barPosition: BarPosition.End, index: this.currentIndex }) {
-      // 笔记页面
       TabContent() {
         Stack({ alignContent: Alignment.BottomEnd }) {
           Column() {
@@ -174,7 +217,7 @@ struct Index {
                     this.noteKeyword = value
                   })
                 if (this.noteKeyword.length > 0) {
-                  Text('✕')
+                  Text('x')
                     .fontSize(16)
                     .fontColor(UiPalette.TEXT_SECONDARY)
                     .margin({ right: 14 })
@@ -190,7 +233,7 @@ struct Index {
                   dateValue: $noteStartDate
                 })
                 if (this.noteStartDate.length > 0) {
-                  Text('✕')
+                  Text('x')
                     .fontSize(14)
                     .fontColor(UiPalette.TEXT_SECONDARY)
                     .onClick(() => {
@@ -204,7 +247,7 @@ struct Index {
                   dateValue: $noteEndDate
                 })
                 if (this.noteEndDate.length > 0) {
-                  Text('✕')
+                  Text('x')
                     .fontSize(14)
                     .fontColor(UiPalette.TEXT_SECONDARY)
                     .onClick(() => {
@@ -214,6 +257,8 @@ struct Index {
               }
               .width('100%')
               .alignItems(VerticalAlign.Center)
+
+              this.TagFilterBar()
             }
             .padding({ left: UiConstants.PAGE_PADDING, right: UiConstants.PAGE_PADDING, bottom: 12 })
 
@@ -226,11 +271,11 @@ struct Index {
                     dateText: note.dateText,
                     tags: note.tags,
                     todoStatus: note.todoStatus,
-                    imagePath: note.imagePath,
+                    imagePath: note.imagePath
                   })
                 }
                 .onClick(() => {
-                    router.pushUrl({ url: 'pages/NoteEditPage', params: { noteId: note.id } })
+                  router.pushUrl({ url: 'pages/NoteEditPage', params: { noteId: note.id } })
                 })
               }, (note: NoteCardViewData) => note.id)
             }
@@ -255,12 +300,11 @@ struct Index {
         .width('100%').height('100%')
       }.tabBar(this.TabBuilder('我的笔记', 0, ''))
 
-      // 待办页面
       TabContent() {
         Stack({ alignContent: Alignment.BottomEnd }) {
           Column() {
             Column() {
-              Text(`待办清单`).fontSize(28).fontWeight(FontWeight.Bold)
+              Text('待办清单').fontSize(28).fontWeight(FontWeight.Bold)
               Text('管理日程，高效每一天').fontSize(16).fontColor('#666').margin({ top: 8 })
             }
             .width('100%').alignItems(HorizontalAlign.Start).padding({ left: UiConstants.PAGE_PADDING, top: 40, bottom: 20 })
@@ -278,7 +322,7 @@ struct Index {
                     this.todoKeyword = value
                   })
                 if (this.todoKeyword.length > 0) {
-                  Text('✕')
+                  Text('x')
                     .fontSize(16)
                     .fontColor(UiPalette.TEXT_SECONDARY)
                     .margin({ right: 14 })
@@ -294,7 +338,7 @@ struct Index {
                   dateValue: $todoStartDate
                 })
                 if (this.todoStartDate.length > 0) {
-                  Text('✕')
+                  Text('x')
                     .fontSize(14)
                     .fontColor(UiPalette.TEXT_SECONDARY)
                     .onClick(() => {
@@ -308,7 +352,7 @@ struct Index {
                   dateValue: $todoEndDate
                 })
                 if (this.todoEndDate.length > 0) {
-                  Text('✕')
+                  Text('x')
                     .fontSize(14)
                     .fontColor(UiPalette.TEXT_SECONDARY)
                     .onClick(() => {
@@ -318,6 +362,8 @@ struct Index {
               }
               .width('100%')
               .alignItems(VerticalAlign.Center)
+
+              this.TagFilterBar()
             }
             .padding({ left: UiConstants.PAGE_PADDING, right: UiConstants.PAGE_PADDING, bottom: 12 })
 
@@ -332,14 +378,17 @@ struct Index {
                     todoStatus: note.todoStatus,
                     imagePath: note.imagePath,
                     onCheckboxChange: (isDone: boolean) => {
-                      this.handleToggleStatus(note.id, isDone)
+                      void this.handleToggleStatus(note.id, isDone)
+                    },
+                    onTodoStatusChange: (status: TodoVisualStatus) => {
+                      void this.handleStatusChange(note.id, status)
                     }
                   })
                 }
                 .onClick(() => {
-                    router.pushUrl({ url: 'pages/TodoDetailPage', params: { noteId: note.id } })
+                  router.pushUrl({ url: 'pages/TodoDetailPage', params: { noteId: note.id } })
                 })
-              }, (note: NoteCardViewData) => note.id + "_" + note.todoStatus)
+              }, (note: NoteCardViewData) => note.id + '_' + note.todoStatus)
             }
             .width('100%')
             .layoutWeight(1)

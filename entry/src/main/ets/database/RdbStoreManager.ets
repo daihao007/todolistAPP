@@ -42,7 +42,8 @@ export class RdbStoreManager {
       imagePath TEXT,
       tags TEXT,
       createTime INTEGER,
-      isTodo INTEGER
+      isTodo INTEGER,
+      todoStatus TEXT
     )`;
 
     const sqlTodos = `CREATE TABLE IF NOT EXISTS ${CommonConstants.TABLE_TODOS} (
@@ -57,6 +58,9 @@ export class RdbStoreManager {
       this.store = await relationalStore.getRdbStore(this.context, config);
       await this.store.executeSql(sqlNotes);
       await this.store.executeSql(sqlTodos);
+      await this.ensureUserIdColumn();
+      await this.ensureTodoStatusColumn();
+      await this.syncLegacyTodoStatus();
       console.info('RDB_LOG: 数据库初始化成功');
     } catch (err) {
       console.error('RDB_LOG: 初始化失败', JSON.stringify(err));
@@ -78,7 +82,8 @@ export class RdbStoreManager {
       'imagePath': note.imagePath,
       'tags': note.tags,
       'createTime': note.createTime,
-      'isTodo': note.isTodo
+      'isTodo': note.isTodo,
+      'todoStatus': note.todoStatus
     };
     return await this.store.insert(CommonConstants.TABLE_NOTES, valueBucket);
   }
@@ -94,7 +99,8 @@ export class RdbStoreManager {
       'imagePath': note.imagePath,
       'tags': note.tags,
       'createTime': note.createTime,
-      'isTodo': note.isTodo
+      'isTodo': note.isTodo,
+      'todoStatus': note.todoStatus
     };
     let predicates = new relationalStore.RdbPredicates(CommonConstants.TABLE_NOTES);
     predicates.equalTo('id', note.id);
@@ -151,10 +157,18 @@ export class RdbStoreManager {
   /**
    * 更新笔记勾选状态
    */
-  async updateNoteCompleteStatus(noteId: string, isDone: boolean) {
+  async updateNoteCompleteStatus(noteId: string, isDone: boolean): Promise<number | void> {
+    return this.updateNoteTodoStatus(noteId, isDone ? TodoVisualStatus.COMPLETED : TodoVisualStatus.PENDING);
+  }
+
+  /**
+   * 更新待办三态：待处理、已完成、已延期。
+   */
+  async updateNoteTodoStatus(noteId: string, todoStatus: TodoVisualStatus): Promise<number | void> {
     if (!this.store) return;
     const valueBucket: relationalStore.ValuesBucket = {
-      'isTodo': isDone ? 0 : 1
+      'isTodo': todoStatus === TodoVisualStatus.COMPLETED ? 0 : 1,
+      'todoStatus': todoStatus
     };
     let predicates = new relationalStore.RdbPredicates(CommonConstants.TABLE_NOTES);
     predicates.equalTo('id', noteId);
@@ -168,7 +182,8 @@ export class RdbStoreManager {
     let result: Note[] = [];
     while (resultSet.goToNextRow()) {
       const isTodoVal = resultSet.getLong(resultSet.getColumnIndex('isTodo'));
-      
+      const todoStatus = this.readTodoStatus(resultSet, isTodoVal);
+
       // 注意：如果有的记录在修改表之前插入的，可能没用到 userId，处理一下异常
       let uId = '';
       try {
@@ -184,12 +199,66 @@ export class RdbStoreManager {
         tags: resultSet.getString(resultSet.getColumnIndex('tags')),
         createTime: resultSet.getLong(resultSet.getColumnIndex('createTime')),
         isTodo: isTodoVal,
-        // 强制转换为枚举类型，适配 UI 组件
-        todoStatus: (isTodoVal === 1 ? TodoVisualStatus.PENDING : TodoVisualStatus.COMPLETED) as TodoVisualStatus
+        todoStatus: todoStatus
       });
     }
     resultSet.close();
     return result;
+  }
+
+  private async ensureUserIdColumn(): Promise<void> {
+    if (!this.store) return;
+    try {
+      await this.store.executeSql(
+        `ALTER TABLE ${CommonConstants.TABLE_NOTES} ADD COLUMN userId TEXT DEFAULT ''`
+      );
+    } catch (err) {
+      console.info('RDB_LOG: userId column already exists');
+    }
+  }
+
+  private async ensureTodoStatusColumn(): Promise<void> {
+    if (!this.store) return;
+    try {
+      await this.store.executeSql(
+        `ALTER TABLE ${CommonConstants.TABLE_NOTES} ADD COLUMN todoStatus TEXT DEFAULT '${TodoVisualStatus.PENDING}'`
+      );
+    } catch (err) {
+      console.info('RDB_LOG: todoStatus column already exists');
+    }
+  }
+
+  private async syncLegacyTodoStatus(): Promise<void> {
+    if (!this.store) return;
+    try {
+      await this.store.executeSql(
+        `UPDATE ${CommonConstants.TABLE_NOTES} SET todoStatus = '${TodoVisualStatus.COMPLETED}' WHERE isTodo = 0`
+      );
+    } catch (err) {
+      console.info('RDB_LOG: sync legacy todo status skipped');
+    }
+  }
+
+  private readTodoStatus(resultSet: relationalStore.ResultSet, isTodoVal: number): TodoVisualStatus {
+    try {
+      const statusIndex = resultSet.getColumnIndex('todoStatus');
+      if (statusIndex >= 0) {
+        const value = resultSet.getString(statusIndex);
+        switch (value) {
+          case TodoVisualStatus.COMPLETED:
+            return TodoVisualStatus.COMPLETED;
+          case TodoVisualStatus.DEFERRED:
+            return TodoVisualStatus.DEFERRED;
+          case TodoVisualStatus.PENDING:
+            return TodoVisualStatus.PENDING;
+          default:
+            break;
+        }
+      }
+    } catch (err) {
+      console.info('RDB_LOG: fallback to legacy todo status');
+    }
+    return isTodoVal === 0 ? TodoVisualStatus.COMPLETED : TodoVisualStatus.PENDING;
   }
 
   /* ==================== 待办操作 (Todo CRUD) ==================== */

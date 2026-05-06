@@ -12,6 +12,25 @@ export struct NoteCard {
 
   // --- C 同学保留：逻辑回调 ---
   onCheckboxChange?: (isDone: boolean) => void
+  onTodoStatusChange?: (status: TodoVisualStatus) => void
+
+  private getStatusOptions(): TodoVisualStatus[] {
+    return [
+      TodoVisualStatus.PENDING,
+      TodoVisualStatus.COMPLETED,
+      TodoVisualStatus.DEFERRED
+    ]
+  }
+
+  private dispatchStatusChange(status: TodoVisualStatus): void {
+    if (this.onTodoStatusChange) {
+      this.onTodoStatusChange(status)
+      return
+    }
+    if (this.onCheckboxChange) {
+      this.onCheckboxChange(status === TodoVisualStatus.COMPLETED)
+    }
+  }
 
   private getStatusTextColor(): string {
     switch (this.todoStatus) {
@@ -50,9 +69,7 @@ export struct NoteCard {
             .height(20)
             .margin({ right: 12, top: 2 })
             .onChange((value: boolean) => {
-              if (this.onCheckboxChange) {
-                this.onCheckboxChange(value)
-              }
+              this.dispatchStatusChange(value ? TodoVisualStatus.COMPLETED : TodoVisualStatus.PENDING)
             })
         }
 
@@ -92,6 +109,24 @@ export struct NoteCard {
       }
       .width('100%')
       .alignItems(VerticalAlign.Top)
+
+      if (this.todoStatus !== TodoVisualStatus.NONE) {
+        Row({ space: 8 }) {
+          ForEach(this.getStatusOptions(), (status: TodoVisualStatus) => {
+            Text(status)
+              .fontSize(UiConstants.CAPTION_SIZE)
+              .fontWeight(this.todoStatus === status ? FontWeight.Medium : FontWeight.Regular)
+              .fontColor(this.todoStatus === status ? this.getStatusTextColor() : UiPalette.TEXT_SECONDARY)
+              .padding({ left: 10, right: 10, top: 6, bottom: 6 })
+              .backgroundColor(this.todoStatus === status ? this.getStatusBackgroundColor() : UiPalette.SURFACE_MUTED)
+              .borderRadius(UiConstants.CHIP_RADIUS)
+              .onClick(() => {
+                this.dispatchStatusChange(status)
+              })
+          }, (status: TodoVisualStatus) => status)
+        }
+        .width('100%')
+      }
 
       // --- B 同学贡献：真实的图片展示组件 ---
       if (this.imagePath.length > 0) {
