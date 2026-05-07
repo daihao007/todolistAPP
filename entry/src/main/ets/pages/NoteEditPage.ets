@@ -36,15 +36,17 @@ export struct NoteEditPage {
   @State loading: boolean = true
   @State saving: boolean = false
   @State pageTitle: string = '新建笔记'
-  private noteId: string = ''
-  private createTime: number = Date.now()
-  private noteService: NoteService | null = null
-  private imageService: ImageService | null = null
-  private readonly tagOptions: TagOption[] = [
+  @State tagInputText: string = ''
+  @State tagHelperText: string = ''
+  @State tagOptions: TagOption[] = [
     new TagOption('工作', UiPalette.TAG_WORK),
     new TagOption('学习', UiPalette.TAG_STUDY),
     new TagOption('生活', UiPalette.TAG_LIFE)
   ]
+  private noteId: string = ''
+  private createTime: number = Date.now()
+  private noteService: NoteService | null = null
+  private imageService: ImageService | null = null
 
   aboutToAppear(): void {
     this.ensureServices()
@@ -126,6 +128,41 @@ export struct NoteEditPage {
       return
     }
     this.selectedTags = [...this.selectedTags, label]
+  }
+
+  private addCustomTag(): void {
+    const label = this.tagInputText.trim().split(',').join('').split('，').join('')
+    if (label.length === 0) {
+      this.tagHelperText = '请输入标签名称。'
+      return
+    }
+
+    if (this.selectedTags.indexOf(label) < 0) {
+      this.selectedTags = [...this.selectedTags, label]
+    }
+    this.tagInputText = ''
+    this.tagHelperText = '已添加到当前笔记的自定义标签。'
+  }
+
+  private removeTag(label: string): void {
+    this.selectedTags = this.selectedTags.filter((tag: string) => tag !== label)
+  }
+
+  private getCustomSelectedTags(): string[] {
+    return this.selectedTags.filter((tag: string) => CommonConstants.DEFAULT_TAGS.indexOf(tag) < 0)
+  }
+
+  private getTagColor(label: string): string {
+    switch (label) {
+      case '工作':
+        return UiPalette.TAG_WORK
+      case '学习':
+        return UiPalette.TAG_STUDY
+      case '生活':
+        return UiPalette.TAG_LIFE
+      default:
+        return UiPalette.SURFACE_MUTED
+    }
   }
 
   private buildEditorInput(): NoteEditorInput {
@@ -501,20 +538,88 @@ export struct NoteEditPage {
               .fontWeight(FontWeight.Medium)
               .fontColor(UiPalette.TEXT_PRIMARY)
 
-            Row({ space: 8 }) {
-              ForEach(this.tagOptions, (tag: TagOption) => {
-                Row() {
-                  TagChip({
-                    label: tag.label,
-                    selected: this.selectedTags.indexOf(tag.label) >= 0,
-                    fillColor: tag.color,
-                    textColor: UiPalette.PRIMARY
+            Scroll() {
+              Row({ space: 8 }) {
+                ForEach(this.tagOptions, (tag: TagOption) => {
+                  Row() {
+                    TagChip({
+                      label: tag.label,
+                      selected: this.selectedTags.indexOf(tag.label) >= 0,
+                      fillColor: tag.color,
+                      textColor: UiPalette.PRIMARY
+                    })
+                  }
+                  .onClick(() => {
+                    this.toggleTag(tag.label)
                   })
-                }
-                .onClick(() => {
-                  this.toggleTag(tag.label)
+                }, (tag: TagOption) => tag.label)
+              }
+            }
+            .width('100%')
+            .scrollable(ScrollDirection.Horizontal)
+            .scrollBar(BarState.Off)
+
+            Row({ space: 10 }) {
+              TextInput({ placeholder: '当前笔记的自定义标签，如：项目A', text: this.tagInputText })
+                .layoutWeight(1)
+                .height(44)
+                .fontSize(UiConstants.BODY_SIZE)
+                .backgroundColor(UiPalette.SURFACE_MUTED)
+                .borderRadius(14)
+                .padding({ left: 12, right: 12 })
+                .onChange((value: string) => {
+                  this.tagInputText = value
+                  this.tagHelperText = ''
                 })
-              }, (tag: TagOption) => tag.label)
+
+              Button('添加')
+                .width(80)
+                .height(44)
+                .fontSize(UiConstants.BODY_SIZE)
+                .fontColor(Color.White)
+                .backgroundColor(UiPalette.PRIMARY)
+                .borderRadius(UiConstants.BUTTON_RADIUS)
+                .onClick(() => {
+                  this.addCustomTag()
+                })
+            }
+            .width('100%')
+
+            if (this.getCustomSelectedTags().length > 0) {
+              Column({ space: 8 }) {
+                Text('已选自定义标签')
+                  .fontSize(UiConstants.CAPTION_SIZE)
+                  .fontColor(UiPalette.TEXT_MUTED)
+
+                Scroll() {
+                  Row({ space: 8 }) {
+                    ForEach(this.getCustomSelectedTags(), (tag: string) => {
+                      Row() {
+                        TagChip({
+                          label: tag,
+                          selected: true,
+                          fillColor: UiPalette.SURFACE_MUTED,
+                          textColor: UiPalette.PRIMARY
+                        })
+                      }
+                      .onClick(() => {
+                        this.removeTag(tag)
+                      })
+                    }, (tag: string) => tag)
+                  }
+                }
+                .width('100%')
+                .scrollable(ScrollDirection.Horizontal)
+                .scrollBar(BarState.Off)
+              }
+              .width('100%')
+              .alignItems(HorizontalAlign.Start)
+            }
+
+            if (this.tagHelperText.length > 0) {
+              Text(this.tagHelperText)
+                .fontSize(UiConstants.CAPTION_SIZE)
+                .fontColor(UiPalette.TEXT_SECONDARY)
             }
           }
           .alignItems(HorizontalAlign.Start)
