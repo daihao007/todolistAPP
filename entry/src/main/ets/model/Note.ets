@@ -7,9 +7,13 @@ export interface Note {
   content: string
   imagePath: string
   tags: string
+  aiTags?: string
+  summary?: string
+  actionItems?: string
+  priority?: number
   createTime: number
   isTodo: number
-  todoStatus: string
+  todoStatus: TodoVisualStatus
 }
 
 export const MockNotes: Note[] = [
@@ -25,7 +29,7 @@ export const MockNotes: Note[] = [
   },
   {
     id: '2',
-    title: '周末采买清单',
+    title: '周末采购清单',
     content: '西瓜、苹果、香菜和牛奶。',
     imagePath: '',
     tags: '生活',

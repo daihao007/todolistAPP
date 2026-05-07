@@ -8,6 +8,10 @@ export class CommonConstants {
   static readonly COL_CONTENT: string = 'content'
   static readonly COL_IMAGE_PATH: string = 'imagePath'
   static readonly COL_TAGS: string = 'tags'
+  static readonly COL_SUMMARY: string = 'summary'
+  static readonly COL_ACTION_ITEMS: string = 'actionItems'
+  static readonly COL_AI_TAGS: string = 'aiTags'
+  static readonly COL_PRIORITY: string = 'priority'
   static readonly COL_CREATE_TIME: string = 'createTime'
   static readonly COL_IS_TODO: string = 'isTodo'
   static readonly COL_TODO_STATUS: string = 'todoStatus'
@@ -17,6 +21,8 @@ export class CommonConstants {
   static readonly PAGE_SEARCH: string = 'pages/SearchResultPage'
 
   static readonly DEFAULT_TAGS: string[] = ['工作', '学习', '生活']
+  static readonly AI_CLOUD_API_URL: string = 'https://your-cloud-ai-endpoint.example.com/analyze'
+  static readonly AI_CLOUD_API_KEY: string = ''
 }
 
 export enum TodoVisualStatus {
@@ -64,7 +70,7 @@ export class UiPalette {
 
 export class UiCopywriting {
   static readonly DESIGN_TITLE: string = '灵感笔记'
-  static readonly DESIGN_SUBTITLE: string = '记录标题、正文、图片与待办状态，首页会自动读取数据库中的真实笔记。'
+  static readonly DESIGN_SUBTITLE: string = '记录标题、正文、图片与待办状态，首页会自动读取数据库里的真实笔记。'
   static readonly NOTE_PREVIEW_TITLE: string = '用一张卡片承载灵感和任务'
   static readonly NOTE_PREVIEW_BODY: string = '支持标题、正文摘要、标签、图片预览和待办状态，让首页列表更统一、更易读。'
 }

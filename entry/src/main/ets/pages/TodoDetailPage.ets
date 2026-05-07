@@ -26,6 +26,11 @@ export struct TodoDetailPage {
   @State contentText: string = ''
   @State imagePath: string = ''
   @State selectedTags: string[] = []
+  @State aiTagsText: string = ''
+  @State aiKeywordsText: string = ''
+  @State aiSummary: string = ''
+  @State aiActionItems: string = ''
+  @State aiLoading: boolean = false
   @State todoStatus: TodoVisualStatus = TodoVisualStatus.PENDING
   @State helperText: string = ''
   @State showError: boolean = false
@@ -81,12 +86,16 @@ export struct TodoDetailPage {
       const note = await noteService.getNoteDetail(this.noteId)
       if (note === null) {
         this.showError = true
-        this.helperText = '未找到要编辑的代办事项。'
+        this.helperText = '未找到要编辑的待办事项。'
       } else {
         this.titleText = note.title
         this.contentText = note.content
         this.imagePath = note.imagePath
         this.selectedTags = noteService.parseTags(note.tags)
+        this.aiTagsText = note.aiTags || ''
+        this.aiSummary = note.summary || ''
+        this.aiActionItems = note.actionItems || ''
+        this.aiKeywordsText = ''
         this.todoStatus = noteService.normalizeTodoStatus(note.todoStatus)
         this.createTime = note.createTime
         this.helperText = ''
@@ -94,7 +103,7 @@ export struct TodoDetailPage {
       }
     } catch (error) {
       this.showError = true
-      this.helperText = '加载失败，请稍后再试。'
+      this.helperText = '加载失败，请稍后重试。'
       Logger.error('TodoDetailPage', `Failed to load note detail: ${JSON.stringify(error)}`)
     } finally {
       this.loading = false
@@ -124,8 +133,68 @@ export struct TodoDetailPage {
       title: this.titleText,
       content: this.contentText,
       imagePath: this.imagePath,
-      tags: this.selectedTags,
-      todoStatus: this.todoStatus
+      tags: [...this.selectedTags, ...this.parseCustomTags()],
+      todoStatus: this.todoStatus,
+      summary: this.aiSummary,
+      actionItems: this.aiActionItems,
+      priority: this.aiKeywordsText.length > 0 ? 1 : 0
+    }
+  }
+
+  private parseCustomTags(): string[] {
+    if (this.aiTagsText.trim().length === 0) {
+      return []
+    }
+    return this.aiTagsText
+      .split(',')
+      .map((tag: string) => tag.trim())
+      .filter((tag: string) => tag.length > 0)
+  }
+
+  private async applyLocalAi(): Promise<void> {
+    this.aiLoading = true
+    this.showError = false
+    try {
+      const noteService = this.noteService
+      if (noteService === null) {
+        throw new Error('笔记服务未初始化')
+      }
+      const aiResult = await noteService.generateLocalAiSuggestion(this.titleText, this.contentText)
+      this.aiTagsText = aiResult.suggestedTags.join(', ')
+      this.aiKeywordsText = aiResult.keywords.join(', ')
+      this.aiSummary = aiResult.summary
+      this.aiActionItems = aiResult.actionItems.join('；')
+      this.todoStatus = aiResult.todoStatus
+      this.selectedTags = [...aiResult.suggestedTags]
+      this.helperText = '本地 AI 推荐已生成，可以继续编辑后保存。'
+    } catch (error) {
+      this.showError = true
+      this.helperText = '本地 AI 生成失败，请检查内容后重试。'
+      Logger.error('TodoDetailPage', `Local AI failed: ${JSON.stringify(error)}`)
+    } finally {
+      this.aiLoading = false
+    }
+  }
+
+  private async applyCloudAi(): Promise<void> {
+    this.aiLoading = true
+    this.showError = false
+    try {
+      const noteService = this.noteService
+      if (noteService === null) {
+        throw new Error('笔记服务未初始化')
+      }
+      const cloudResult = await noteService.requestCloudAiReview(this.titleText, this.contentText)
+      this.aiSummary = cloudResult.summary
+      this.aiActionItems = cloudResult.actionItems.join('；')
+      this.aiTagsText = cloudResult.suggestedTags.join(', ')
+      this.helperText = '云端 AI 整理完成，可以编辑后保存。'
+    } catch (error) {
+      this.showError = true
+      this.helperText = '云端 AI 请求失败，请稍后重试。'
+      Logger.error('TodoDetailPage', `Cloud AI failed: ${JSON.stringify(error)}`)
+    } finally {
+      this.aiLoading = false
     }
   }
 
@@ -144,7 +213,7 @@ export struct TodoDetailPage {
       }
     } catch (error) {
       this.showError = true
-      this.helperText = '选择图片失败，请稍后再试。'
+      this.helperText = '选择图片失败，请稍后重试。'
       Logger.error('TodoDetailPage', `Failed to pick image: ${JSON.stringify(error)}`)
     }
   }
@@ -235,7 +304,7 @@ export struct TodoDetailPage {
                 this.titleText = value
                 if (value.trim().length > 0) {
                   this.showError = false
-                  if (this.helperText === '事项不能为空。') {
+                  if (this.helperText === '标题不能为空。') {
                     this.helperText = ''
                   }
                 }
@@ -268,6 +337,98 @@ export struct TodoDetailPage {
               .padding(14)
               .onChange((value: string) => {
                 this.contentText = value
+              })
+          }
+          .alignItems(HorizontalAlign.Start)
+          .width('100%')
+          .padding(16)
+          .backgroundColor(UiPalette.SURFACE)
+          .borderRadius(UiConstants.CARD_RADIUS)
+
+          Column({ space: 10 }) {
+            Text('AI 智能整理')
+              .fontSize(UiConstants.SUBTITLE_SIZE)
+              .fontWeight(FontWeight.Medium)
+              .fontColor(UiPalette.TEXT_PRIMARY)
+
+            Row({ space: 12 }) {
+              Button(this.aiLoading ? 'AI 处理中...' : '本地 AI 自动提取')
+                .layoutWeight(1)
+                .height(44)
+                .fontSize(UiConstants.BODY_SIZE)
+                .fontColor(Color.White)
+                .backgroundColor(UiPalette.PRIMARY)
+                .borderRadius(UiConstants.BUTTON_RADIUS)
+                .onClick(() => {
+                  if (!this.aiLoading) {
+                    void this.applyLocalAi()
+                  }
+                })
+
+              Button('云端 AI 整理')
+                .layoutWeight(1)
+                .height(44)
+                .fontSize(UiConstants.BODY_SIZE)
+                .fontColor(UiPalette.TEXT_PRIMARY)
+                .backgroundColor(UiPalette.SURFACE_MUTED)
+                .borderRadius(UiConstants.BUTTON_RADIUS)
+                .onClick(() => {
+                  if (!this.aiLoading) {
+                    void this.applyCloudAi()
+                  }
+                })
+            }
+            .width('100%')
+
+            if (this.aiKeywordsText.length > 0) {
+              Text(`关键词：${this.aiKeywordsText}`)
+                .fontSize(UiConstants.CAPTION_SIZE)
+                .fontColor(UiPalette.TEXT_MUTED)
+            }
+
+            Text('AI 推荐标签（可编辑，逗号分隔）')
+              .fontSize(UiConstants.CAPTION_SIZE)
+              .fontColor(UiPalette.TEXT_SECONDARY)
+
+            TextInput({ placeholder: '例如：工作, 会议, 紧急', text: this.aiTagsText })
+              .width('100%')
+              .height(44)
+              .fontSize(UiConstants.BODY_SIZE)
+              .backgroundColor(UiPalette.SURFACE_MUTED)
+              .borderRadius(14)
+              .padding({ left: 14, right: 14 })
+              .onChange((value: string) => {
+                this.aiTagsText = value
+              })
+
+            Text('AI 生成摘要')
+              .fontSize(UiConstants.CAPTION_SIZE)
+              .fontColor(UiPalette.TEXT_SECONDARY)
+
+            TextArea({ placeholder: 'AI 会在这里生成摘要，支持编辑后保存', text: this.aiSummary })
+              .width('100%')
+              .height(120)
+              .fontSize(UiConstants.BODY_SIZE)
+              .backgroundColor(UiPalette.SURFACE_MUTED)
+              .borderRadius(14)
+              .padding(14)
+              .onChange((value: string) => {
+                this.aiSummary = value
+              })
+
+            Text('AI 生成待办/行动项')
+              .fontSize(UiConstants.CAPTION_SIZE)
+              .fontColor(UiPalette.TEXT_SECONDARY)
+
+            TextArea({ placeholder: 'AI 会在这里列出行动项，支持编辑后保存', text: this.aiActionItems })
+              .width('100%')
+              .height(120)
+              .fontSize(UiConstants.BODY_SIZE)
+              .backgroundColor(UiPalette.SURFACE_MUTED)
+              .borderRadius(14)
+              .padding(14)
+              .onChange((value: string) => {
+                this.aiActionItems = value
               })
           }
           .alignItems(HorizontalAlign.Start)
@@ -323,7 +484,7 @@ export struct TodoDetailPage {
               }
               .width('100%')
             } else {
-              Text('暂未选择图片，支持直接保存纯文本笔记。')
+              Text('暂未选择图片，支持直接保存纯文本待办。')
                 .fontSize(UiConstants.CAPTION_SIZE)
                 .fontColor(UiPalette.TEXT_MUTED)
             }
@@ -403,7 +564,7 @@ export struct TodoDetailPage {
 
             NoteCard({
               title: this.titleText.trim().length > 0 ? this.titleText : '尚未填写标题',
-              content: this.contentText.trim().length > 0 ? this.contentText : '正文为空时，这里会展示空白内容。',
+              content: this.contentText.trim().length > 0 ? this.contentText : '正文为空时，这里会显示空白内容。',
               dateText: this.getPreviewDate(),
               imagePath: this.imagePath,
               tags: this.selectedTags,
