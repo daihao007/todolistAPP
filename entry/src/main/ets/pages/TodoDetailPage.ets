@@ -1,4 +1,5 @@
 import router from '@ohos.router'
+import promptAction from '@ohos.promptAction'
 import common from '@ohos.app.ability.common'
 import { CommonConstants, TodoVisualStatus, UiConstants, UiPalette } from '../common/Constants'
 import { NoteCard } from '../components/NoteCard'
@@ -26,6 +27,7 @@ export struct TodoDetailPage {
   @State contentText: string = ''
   @State imagePath: string = ''
   @State selectedTags: string[] = []
+  @State aiSelectedTags: string[] = []
   @State aiTagsText: string = ''
   @State aiKeywordsText: string = ''
   @State aiSummary: string = ''
@@ -92,6 +94,7 @@ export struct TodoDetailPage {
         this.contentText = note.content
         this.imagePath = note.imagePath
         this.selectedTags = noteService.parseTags(note.tags)
+        this.aiSelectedTags = noteService.parseTags(note.aiTags || '')
         this.aiTagsText = note.aiTags || ''
         this.aiSummary = note.summary || ''
         this.aiActionItems = note.actionItems || ''
@@ -123,6 +126,7 @@ export struct TodoDetailPage {
     const exists = this.selectedTags.indexOf(label) >= 0
     if (exists) {
       this.selectedTags = this.selectedTags.filter((item: string) => item !== label)
+      this.removeAiTagSelection(label)
       return
     }
     this.selectedTags = [...this.selectedTags, label]
@@ -133,8 +137,9 @@ export struct TodoDetailPage {
       title: this.titleText,
       content: this.contentText,
       imagePath: this.imagePath,
-      tags: [...this.selectedTags, ...this.parseCustomTags()],
-      todoStatus: this.todoStatus,
+      tags: this.selectedTags,
+      aiTags: this.aiSelectedTags,
+      todoStatus: this.resolveTodoStatus(),
       summary: this.aiSummary,
       actionItems: this.aiActionItems,
       priority: this.aiKeywordsText.length > 0 ? 1 : 0
@@ -151,6 +156,30 @@ export struct TodoDetailPage {
       .filter((tag: string) => tag.length > 0)
   }
 
+  private applyAiTagSelection(nextAiTags: string[]): void {
+    const manualTags = this.selectedTags.filter((tag: string) => this.aiSelectedTags.indexOf(tag) < 0)
+    this.aiSelectedTags = nextAiTags
+    this.aiTagsText = nextAiTags.join(', ')
+    this.selectedTags = [...manualTags]
+    nextAiTags.forEach((tag: string) => {
+      if (this.selectedTags.indexOf(tag) < 0) {
+        this.selectedTags = [...this.selectedTags, tag]
+      }
+    })
+  }
+
+  private removeAiTagSelection(label: string): void {
+    if (this.aiSelectedTags.indexOf(label) < 0) {
+      return
+    }
+    this.aiSelectedTags = this.aiSelectedTags.filter((tag: string) => tag !== label)
+    this.aiTagsText = this.aiSelectedTags.join(', ')
+  }
+
+  private resolveTodoStatus(): TodoVisualStatus {
+    return this.todoStatus === TodoVisualStatus.NONE ? TodoVisualStatus.PENDING : this.todoStatus
+  }
+
   private async applyLocalAi(): Promise<void> {
     this.aiLoading = true
     this.showError = false
@@ -160,12 +189,11 @@ export struct TodoDetailPage {
         throw new Error('笔记服务未初始化')
       }
       const aiResult = await noteService.generateLocalAiSuggestion(this.titleText, this.contentText)
-      this.aiTagsText = aiResult.suggestedTags.join(', ')
+      this.applyAiTagSelection(aiResult.suggestedTags)
       this.aiKeywordsText = aiResult.keywords.join(', ')
       this.aiSummary = aiResult.summary
       this.aiActionItems = aiResult.actionItems.join('；')
-      this.todoStatus = aiResult.todoStatus
-      this.selectedTags = [...aiResult.suggestedTags]
+      this.todoStatus = aiResult.todoStatus === TodoVisualStatus.NONE ? TodoVisualStatus.PENDING : aiResult.todoStatus
       this.helperText = '本地 AI 推荐已生成，可以继续编辑后保存。'
     } catch (error) {
       this.showError = true
@@ -186,13 +214,16 @@ export struct TodoDetailPage {
       }
       const cloudResult = await noteService.requestCloudAiReview(this.titleText, this.contentText)
       this.aiSummary = cloudResult.summary
+      this.aiKeywordsText = cloudResult.keywords.join(', ')
       this.aiActionItems = cloudResult.actionItems.join('；')
-      this.aiTagsText = cloudResult.suggestedTags.join(', ')
+      this.applyAiTagSelection(cloudResult.suggestedTags)
       this.helperText = '云端 AI 整理完成，可以编辑后保存。'
+      promptAction.showToast({ message: '云端大模型调用成功！' })
     } catch (error) {
+      const errMsg = error instanceof Error ? error.message : JSON.stringify(error);
       this.showError = true
-      this.helperText = '云端 AI 请求失败，请稍后重试。'
-      Logger.error('TodoDetailPage', `Cloud AI failed: ${JSON.stringify(error)}`)
+      this.helperText = `云端 AI 请求失败: ${errMsg}`
+      Logger.error('TodoDetailPage', `Cloud AI failed: ${errMsg}`)
     } finally {
       this.aiLoading = false
     }
@@ -249,13 +280,48 @@ export struct TodoDetailPage {
       router.replaceUrl({
         url: CommonConstants.PAGE_INDEX,
         params: {
-          refreshAt: Date.now().toString()
+          refreshAt: Date.now().toString(),
+          targetTab: '1'
         }
       })
     } catch (error) {
       this.showError = true
       this.helperText = '保存失败，请稍后重试。'
       Logger.error('TodoDetailPage', `Failed to save note: ${JSON.stringify(error)}`)
+    } finally {
+      this.saving = false
+    }
+  }
+
+  private async deleteTodo(): Promise<void> {
+    if (this.noteId.length === 0) {
+      router.back()
+      return
+    }
+
+    const noteService = this.noteService
+    if (noteService === null) {
+      this.showError = true
+      this.helperText = '服务初始化失败。'
+      return
+    }
+
+    this.saving = true
+    this.showError = false
+    this.helperText = ''
+    try {
+      await noteService.deleteTodo(this.noteId)
+      router.replaceUrl({
+        url: CommonConstants.PAGE_INDEX,
+        params: {
+          refreshAt: Date.now().toString(),
+          targetTab: '1'
+        }
+      })
+    } catch (error) {
+      this.showError = true
+      this.helperText = '删除失败，请稍后重试。'
+      Logger.error('TodoDetailPage', `Failed to delete todo: ${JSON.stringify(error)}`)
     } finally {
       this.saving = false
     }
@@ -399,6 +465,7 @@ export struct TodoDetailPage {
               .padding({ left: 14, right: 14 })
               .onChange((value: string) => {
                 this.aiTagsText = value
+                this.applyAiTagSelection(this.parseCustomTags())
               })
 
             Text('AI 生成摘要')
@@ -549,6 +616,21 @@ export struct TodoDetailPage {
                 void this.saveNote()
               }
             })
+
+          if (this.noteId.length > 0) {
+            Button(this.saving ? '正在处理...' : '删除待办')
+              .width('100%')
+              .height(52)
+              .fontSize(UiConstants.BODY_SIZE)
+              .fontColor(Color.White)
+              .backgroundColor(UiPalette.DANGER)
+              .borderRadius(UiConstants.BUTTON_RADIUS)
+              .onClick(() => {
+                if (!this.saving) {
+                  void this.deleteTodo()
+                }
+              })
+          }
 
           if (!this.showError && this.helperText.length > 0) {
             Text(this.helperText)

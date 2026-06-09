@@ -11,6 +11,7 @@ export interface NoteEditorInput {
   content: string
   imagePath: string
   tags: string[]
+  aiTags: string[]
   todoStatus: TodoVisualStatus
   summary: string
   actionItems: string
@@ -28,15 +29,20 @@ export interface AiSuggestion {
 
 export interface CloudAiResult {
   summary: string
+  keywords: string[]
   actionItems: string[]
   suggestedTags: string[]
 }
 
 interface CloudRequestPayload {
-  title: string
+  model: string
+  messages: CloudRequestMessage[]
+  temperature: number
+}
+
+interface CloudRequestMessage {
+  role: string
   content: string
-  input: string
-  mode: string
 }
 
 interface CloudMessagePayload {
@@ -49,10 +55,18 @@ interface CloudChoicePayload {
 
 interface CloudResponsePayload {
   summary?: string
+  keywords?: Array<string>
   actionItems?: Array<string>
   suggestedTags?: Array<string>
+  tags?: Array<string>
   data?: CloudResponsePayload
   choices?: Array<CloudChoicePayload>
+}
+
+interface SummarySentenceScore {
+  sentence: string
+  index: number
+  score: number
 }
 
 export class NoteService {
@@ -78,7 +92,7 @@ export class NoteService {
       content: input.content.trim(),
       imagePath: input.imagePath,
       tags: this.tagsToText(input.tags),
-      aiTags: this.tagsToText(input.tags),
+      aiTags: this.tagsToText(input.aiTags),
       summary: input.summary.trim(),
       actionItems: input.actionItems.trim(),
       priority: input.priority,
@@ -106,7 +120,7 @@ export class NoteService {
       content: input.content.trim(),
       imagePath: input.imagePath,
       tags: this.tagsToText(input.tags),
-      aiTags: this.tagsToText(input.tags),
+      aiTags: this.tagsToText(input.aiTags),
       summary: input.summary.trim(),
       actionItems: input.actionItems.trim(),
       priority: input.priority,
@@ -127,6 +141,16 @@ export class NoteService {
   async getAllNotes(): Promise<Note[]> {
     const currentUserId = await this.getCurrentUser()
     return this.rdbStoreManager.queryAllNotes(currentUserId)
+  }
+
+  async deleteNote(noteId: string): Promise<void> {
+    await this.rdbStoreManager.deleteNote(noteId)
+    Logger.info('NoteService', `Deleted note ${noteId}`)
+  }
+
+  async deleteTodo(noteId: string): Promise<void> {
+    await this.rdbStoreManager.deleteNote(noteId)
+    Logger.info('NoteService', `Deleted todo ${noteId}`)
   }
 
   async generateLocalAiSuggestion(title: string, content: string): Promise<AiSuggestion> {
@@ -159,11 +183,20 @@ export class NoteService {
       return this.buildFallbackCloudResult(title, content)
     }
 
+    const prompt = this.buildCloudAiPrompt(title, content)
     const payload: CloudRequestPayload = {
-      title: title.trim(),
-      content: content.trim(),
-      input: normalizedText,
-      mode: 'summarize'
+      model: CommonConstants.AI_CLOUD_MODEL,
+      messages: [
+        {
+          role: 'system',
+          content: '你是一个笔记整理助手。请只返回 JSON，不要输出任何额外说明。'
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      temperature: 0.3
     }
 
     let authorization: string | undefined = undefined
@@ -176,34 +209,43 @@ export class NoteService {
       const parsed = this.parseCloudResponse(response)
       return {
         summary: parsed.summary,
+        keywords: parsed.keywords,
         actionItems: parsed.actionItems,
         suggestedTags: parsed.suggestedTags
       }
     } catch (error) {
-      Logger.error('NoteService', `Cloud AI request failed: ${JSON.stringify(error)}`)
-      return this.buildFallbackCloudResult(title, content)
+      const errMsg = error instanceof Error ? error.message : JSON.stringify(error);
+      Logger.error('NoteService', `Cloud AI request failed: ${errMsg}`)
+      throw new Error(`Cloud AI request failed: ${errMsg}`)
     }
   }
 
   private parseCloudResponse(response: string): CloudAiResult {
     const parsed = JSON.parse(response) as CloudResponsePayload
     const directSummary = this.pickString(parsed.summary)
+    const directKeywords = this.pickStringList(parsed.keywords)
     const directActions = this.pickStringList(parsed.actionItems)
     const directTags = this.pickStringList(parsed.suggestedTags)
-    if (directSummary.length > 0 || directActions.length > 0 || directTags.length > 0) {
+    const fallbackTags = this.pickStringList(parsed.tags)
+    const resolvedTags = directTags.length > 0 ? directTags : fallbackTags
+    if (directSummary.length > 0 || directKeywords.length > 0 || directActions.length > 0 || resolvedTags.length > 0) {
       return {
         summary: directSummary,
+        keywords: directKeywords,
         actionItems: directActions,
-        suggestedTags: directTags
+        suggestedTags: resolvedTags
       }
     }
 
     const dataBlock = parsed.data
     if (dataBlock !== undefined) {
+      const dataSuggestedTags = this.pickStringList(dataBlock.suggestedTags)
+      const dataFallbackTags = this.pickStringList(dataBlock.tags)
       return {
         summary: this.pickString(dataBlock.summary),
+        keywords: this.pickStringList(dataBlock.keywords),
         actionItems: this.pickStringList(dataBlock.actionItems),
-        suggestedTags: this.pickStringList(dataBlock.suggestedTags)
+        suggestedTags: dataSuggestedTags.length > 0 ? dataSuggestedTags : dataFallbackTags
       }
     }
 
@@ -214,10 +256,18 @@ export class NoteService {
       const messageContent = message === undefined ? '' : this.pickString(message.content)
       if (messageContent.length > 0) {
         try {
-          return this.parseCloudResponse(messageContent)
+          // 清理大模型可能返回的 ```json ``` 标记
+          let cleanContent = messageContent;
+          if (cleanContent.startsWith('```json')) {
+            cleanContent = cleanContent.replace(/^```json/, '').replace(/```$/, '').trim();
+          } else if (cleanContent.startsWith('```')) {
+            cleanContent = cleanContent.replace(/^```/, '').replace(/```$/, '').trim();
+          }
+          return this.parseCloudResponse(cleanContent)
         } catch (_error) {
           return {
             summary: messageContent,
+            keywords: [],
             actionItems: [],
             suggestedTags: []
           }
@@ -253,6 +303,7 @@ export class NoteService {
     const merged = `${title.trim()} ${content.trim()}`.trim()
     return {
       summary: this.buildLocalSummary(merged),
+      keywords: this.extractKeywords(merged),
       actionItems: this.extractActionItems(merged),
       suggestedTags: this.extractTagsFromText(merged)
     }
@@ -327,19 +378,44 @@ export class NoteService {
   }
 
   private buildLocalSummary(text: string): string {
-    if (text.length <= 120) {
-      return text.trim()
+    const normalized = text
+      .replace(/\s+/g, ' ')
+      .replace(/[，,]{2,}/g, '，')
+      .trim()
+
+    if (normalized.length === 0) {
+      return ''
     }
-    const snippet = text.substring(0, 120).trim()
-    return `${snippet}...`
+
+    const sentences = this.splitToSentences(normalized)
+    if (sentences.length === 0) {
+      return this.limitSummaryLength(normalized)
+    }
+
+    const keywords = this.extractKeywords(normalized)
+    const rankedSentenceScores: SummarySentenceScore[] = sentences
+      .map((sentence: string, index: number): SummarySentenceScore => {
+        return {
+          sentence: sentence,
+          index: index,
+          score: this.scoreSummarySentence(sentence, keywords)
+        }
+      })
+      .sort((a: SummarySentenceScore, b: SummarySentenceScore) => b.score - a.score || a.index - b.index)
+      .slice(0, Math.min(2, sentences.length))
+      .sort((a: SummarySentenceScore, b: SummarySentenceScore) => a.index - b.index)
+
+    const rankedSentences: string[] = rankedSentenceScores.map((item: SummarySentenceScore) => item.sentence)
+    const summary = rankedSentences.join('；')
+    return this.limitSummaryLength(summary.length > 0 ? summary : normalized)
   }
 
   private extractActionItems(text: string): string[] {
     const lines = text.split(/[。；;\n\r]/)
     const items: string[] = []
-    const actionWords = ['需要', '请', '记得', '务必', '安排', '完成', '落实']
+    const actionWords = ['需要', '请', '记得', '务必', '安排', '完成', '落实', '准备', '确认', '跟进', '提交', '联系', '推进']
     for (const line of lines) {
-      const trimmed = line.trim()
+      const trimmed = this.normalizeActionItem(line)
       if (trimmed.length === 0) {
         continue
       }
@@ -350,6 +426,20 @@ export class NoteService {
         }
       }
     }
+
+    if (items.length === 0) {
+      const fallbackSentences = this.splitToSentences(text)
+      for (const sentence of fallbackSentences) {
+        const normalizedSentence = this.normalizeActionItem(sentence)
+        if (normalizedSentence.length > 0 && items.indexOf(normalizedSentence) < 0) {
+          items.push(normalizedSentence)
+        }
+        if (items.length >= 3) {
+          break
+        }
+      }
+    }
+
     return items
   }
 
@@ -413,5 +503,68 @@ export class NoteService {
   private generateNoteId(timestamp: number): string {
     const randomSuffix = Math.floor(Math.random() * 1000).toString().padStart(3, '0')
     return `note-${timestamp}-${randomSuffix}`
+  }
+
+  private buildCloudAiPrompt(title: string, content: string): string {
+    return [
+      '请根据下面的笔记内容，生成摘要、关键词、待办事项和推荐标签。',
+      '请严格返回 JSON，格式如下：',
+      '{"summary":"...","keywords":["..."],"actionItems":["..."],"suggestedTags":["..."]}',
+      '要求：',
+      '1. summary 用简体中文，1到3句。',
+      '2. keywords 返回 3 到 5 个关键词。',
+      '3. actionItems 返回 1 到 5 条可执行待办；如果内容里没有明确待办，可以基于笔记整理出合理行动项。',
+      '4. suggestedTags 返回 2 到 4 个简短标签。',
+      `标题：${title.trim()}`,
+      `内容：${content.trim()}`
+    ].join('\n')
+  }
+
+  private splitToSentences(text: string): string[] {
+    return text
+      .split(/[。！？；;\n\r]/)
+      .map((sentence: string) => sentence.trim())
+      .filter((sentence: string) => sentence.length >= 6)
+  }
+
+  private scoreSummarySentence(sentence: string, keywords: string[]): number {
+    let score = Math.min(sentence.length, 40)
+
+    keywords.forEach((keyword: string, index: number) => {
+      if (keyword.length >= 2 && sentence.indexOf(keyword) >= 0) {
+        score += Math.max(8 - index, 3)
+      }
+    })
+
+    const summaryHints = ['目标', '计划', '需要', '准备', '安排', '问题', '风险', '结论', '总结', '完成', '推进']
+    summaryHints.forEach((hint: string) => {
+      if (sentence.indexOf(hint) >= 0) {
+        score += 6
+      }
+    })
+
+    if (sentence.length < 10) {
+      score -= 8
+    }
+    if (sentence.length > 80) {
+      score -= 4
+    }
+
+    return score
+  }
+
+  private limitSummaryLength(text: string): string {
+    if (text.length <= 120) {
+      return text
+    }
+    return `${text.substring(0, 117).trim()}...`
+  }
+
+  private normalizeActionItem(text: string): string {
+    return text
+      .trim()
+      .replace(/^[\d\-•.\s]+/g, '')
+      .replace(/[。；;，,]+$/g, '')
+      .trim()
   }
 }

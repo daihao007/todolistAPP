@@ -10,6 +10,8 @@ import { RdbStoreManager } from '../database/RdbStoreManager'
 import { NoteViewModel, NoteCardViewData } from '../viewmodel/NoteViewModel'
 import { NoteCard } from '../components/NoteCard'
 import { TagChip } from '../components/TagChip'
+import { PreferenceUtil } from '../utils/PreferenceUtil'
+import promptAction from '@ohos.promptAction'
 
 @Component
 struct DatePickerButton {
@@ -20,14 +22,14 @@ struct DatePickerButton {
   build() {
     Row() {
       Text(this.dateValue ? this.dateValue : this.placeholder)
-        .fontColor(this.dateValue ? UiPalette.TEXT_PRIMARY : '#999')
+        .fontColor(this.dateValue ? UiPalette.TEXT_PRIMARY : UiPalette.TEXT_MUTED)
         .fontSize(UiConstants.BODY_SIZE)
     }
     .layoutWeight(1)
-    .height(44)
-    .padding({ left: 14, right: 14 })
+    .height(48)
+    .padding({ left: 16, right: 16 })
     .backgroundColor(UiPalette.SURFACE)
-    .borderRadius(14)
+    .borderRadius(999)
     .onClick(() => {
       let selectedDate = this.dateValue ? new Date(this.dateValue) : new Date()
       let startDate = this.minDate ? new Date(this.minDate) : new Date('2020-01-01')
@@ -55,6 +57,9 @@ struct Index {
   @State noteList: NoteCardViewData[] = []
   @State loading: boolean = true
   @State username: string = '开发者'
+  @State currentUser: string = ''
+  @State nicknameDraft: string = ''
+  @State editingNickname: boolean = false
   @State currentIndex: number = 0
   @State noteKeyword: string = ''
   @State noteStartDate: string = ''
@@ -70,7 +75,9 @@ struct Index {
 
   async aboutToAppear() {
     this.ensureViewModel()
+    this.applyRouteParams()
     try {
+      await this.loadCurrentUser()
       await this.db.initDb()
       await this.loadNotes()
     } catch (err) {
@@ -79,9 +86,66 @@ struct Index {
   }
 
   onPageShow(): void {
+    this.applyRouteParams()
+    this.loadCurrentUser().catch((err: Error) => {
+      console.error('E_Log: 用户信息读取失败 ' + err.message)
+    })
     this.loadNotes().catch((err: Error) => {
       console.error('E_Log: 刷新失败 ' + err.message)
     })
+  }
+
+  private async loadCurrentUser(): Promise<void> {
+    const context = getContext(this) as common.Context
+    const currentUser = await PreferenceUtil.getString(context, 'CURRENT_USER', '')
+    this.currentUser = currentUser
+    if (currentUser.length === 0) {
+      this.username = '开发者'
+      this.nicknameDraft = ''
+      return
+    }
+    const nickname = await PreferenceUtil.getString(context, `NICKNAME_${currentUser}`, '')
+    const displayName = nickname.trim().length > 0 ? nickname.trim() : currentUser
+    this.username = displayName
+    this.nicknameDraft = displayName
+  }
+
+  private async saveNickname(): Promise<void> {
+    const nextNickname = this.nicknameDraft.trim()
+    if (nextNickname.length === 0) {
+      promptAction.showToast({ message: '昵称不能为空' })
+      return
+    }
+    if (this.currentUser.length === 0) {
+      promptAction.showToast({ message: '请先登录' })
+      return
+    }
+    const context = getContext(this) as common.Context
+    await PreferenceUtil.putString(context, `NICKNAME_${this.currentUser}`, nextNickname)
+    this.username = nextNickname
+    this.editingNickname = false
+    promptAction.showToast({ message: '昵称已更新' })
+  }
+
+  private handleLogout(): void {
+    router.replaceUrl({ url: 'pages/LoginPage' })
+  }
+
+  private applyRouteParams(): void {
+    const params = router.getParams() as Record<string, string | number> | undefined
+    if (params === undefined) {
+      return
+    }
+
+    const targetTab = params.targetTab
+    if (targetTab === 0 || targetTab === '0') {
+      this.currentIndex = 0
+      return
+    }
+
+    if (targetTab === 1 || targetTab === '1') {
+      this.currentIndex = 1
+    }
   }
 
   private ensureViewModel(): void {
@@ -156,14 +220,29 @@ struct Index {
 
   @Builder TabBuilder(title: string, targetIndex: number, iconRaw: string) {
     Column() {
-      Text(title)
-        .fontColor(this.currentIndex === targetIndex ? UiPalette.PRIMARY : '#999')
-        .fontSize(16)
-        .fontWeight(this.currentIndex === targetIndex ? FontWeight.Bold : FontWeight.Normal)
-        .margin({ top: 4 })
+      Column({ space: 2 }) {
+        Text(title)
+          .fontColor(this.currentIndex === targetIndex ? UiPalette.TEXT_PRIMARY : UiPalette.TEXT_MUTED)
+          .fontSize(14)
+          .fontWeight(this.currentIndex === targetIndex ? FontWeight.Bold : FontWeight.Medium)
+
+        if (this.currentIndex === targetIndex) {
+          Text('•')
+            .fontSize(14)
+            .fontColor(UiPalette.PRIMARY)
+        }
+      }
+      .padding({ left: 16, right: 16, top: 8, bottom: 8 })
+      .backgroundColor(this.currentIndex === targetIndex ? UiPalette.PRIMARY_SOFT : UiPalette.SURFACE)
+      .borderRadius(999)
+      .shadow({
+        radius: this.currentIndex === targetIndex ? 10 : 0,
+        color: '#18FFB7C5',
+        offsetY: 4
+      })
     }
     .width('100%')
-    .height(50)
+    .height(60)
     .justifyContent(FlexAlign.Center)
     .onClick(() => {
       this.currentIndex = targetIndex
@@ -198,29 +277,108 @@ struct Index {
       TabContent() {
         Stack({ alignContent: Alignment.BottomEnd }) {
           Column() {
-            Column() {
-              Text(`你好，${this.username}`).fontSize(28).fontWeight(FontWeight.Bold)
-              Text('让创意随时随地发芽').fontSize(16).fontColor('#666').margin({ top: 8 })
+            Row() {
+              Column({ space: 8 }) {
+                if (this.editingNickname) {
+                  Row({ space: 8 }) {
+                    Text('你好，')
+                      .fontSize(28)
+                      .fontWeight(FontWeight.Bold)
+                      .fontColor(UiPalette.TEXT_PRIMARY)
+
+                    TextInput({ placeholder: '输入昵称', text: this.nicknameDraft })
+                      .width(180)
+                      .height(40)
+                      .fontSize(18)
+                      .backgroundColor(UiPalette.SURFACE)
+                      .borderRadius(12)
+                      .padding({ left: 12, right: 12 })
+                      .onChange((value: string) => {
+                        this.nicknameDraft = value
+                      })
+                  }
+                } else {
+                  Text(`你好，${this.username}`)
+                    .fontSize(28)
+                    .fontWeight(FontWeight.Bold)
+                    .fontColor(UiPalette.TEXT_PRIMARY)
+                }
+
+                Text('今日份的阳光与灵感已查收')
+                  .fontSize(16)
+                  .fontColor(UiPalette.TEXT_SECONDARY)
+              }
+              .layoutWeight(1)
+              .alignItems(HorizontalAlign.Start)
+
+              Row({ space: 8 }) {
+                if (this.editingNickname) {
+                  Button('保存')
+                    .height(36)
+                    .fontSize(14)
+                    .backgroundColor(UiPalette.PRIMARY)
+                    .fontColor(Color.White)
+                    .borderRadius(18)
+                    .onClick(() => {
+                      void this.saveNickname()
+                    })
+
+                  Button('取消')
+                    .height(36)
+                    .fontSize(14)
+                    .backgroundColor(UiPalette.SURFACE)
+                    .fontColor(UiPalette.TEXT_PRIMARY)
+                    .borderRadius(18)
+                    .onClick(() => {
+                      this.nicknameDraft = this.username
+                      this.editingNickname = false
+                    })
+                } else {
+                  Button('改昵称')
+                    .height(36)
+                    .fontSize(14)
+                    .backgroundColor(UiPalette.SURFACE)
+                    .fontColor(UiPalette.TEXT_PRIMARY)
+                    .borderRadius(18)
+                    .onClick(() => {
+                      this.editingNickname = true
+                    })
+
+                  Button('登出')
+                    .height(36)
+                    .fontSize(14)
+                    .backgroundColor(UiPalette.SURFACE)
+                    .fontColor(UiPalette.TEXT_PRIMARY)
+                    .borderRadius(18)
+                    .onClick(() => {
+                      this.handleLogout()
+                    })
+                }
+              }
             }
-            .width('100%').alignItems(HorizontalAlign.Start).padding({ left: UiConstants.PAGE_PADDING, top: 40, bottom: 20 })
+            .width('100%')
+            .alignItems(VerticalAlign.Center)
+            .padding({ left: UiConstants.PAGE_PADDING, right: UiConstants.PAGE_PADDING, top: 40, bottom: 20 })
 
             Column({ space: 12 }) {
               Stack({ alignContent: Alignment.End }) {
                 TextInput({ placeholder: '输入关键字搜索笔记...', text: this.noteKeyword })
                   .width('100%')
-                  .height(44)
+                  .height(48)
                   .fontSize(UiConstants.BODY_SIZE)
                   .backgroundColor(UiPalette.SURFACE)
-                  .borderRadius(14)
-                  .padding({ left: 14, right: 40 })
+                  .borderRadius(999)
+                  .padding({ left: 20, right: 40 })
+                  .placeholderColor(UiPalette.TEXT_MUTED)
+                  .fontColor(UiPalette.TEXT_PRIMARY)
                   .onChange((value: string) => {
                     this.noteKeyword = value
                   })
                 if (this.noteKeyword.length > 0) {
-                  Text('x')
-                    .fontSize(16)
+                  Text('✕')
+                    .fontSize(18)
                     .fontColor(UiPalette.TEXT_SECONDARY)
-                    .margin({ right: 14 })
+                    .margin({ right: 16 })
                     .onClick(() => {
                       this.noteKeyword = ''
                     })
@@ -233,8 +391,8 @@ struct Index {
                   dateValue: $noteStartDate
                 })
                 if (this.noteStartDate.length > 0) {
-                  Text('x')
-                    .fontSize(14)
+                  Text('✕')
+                    .fontSize(16)
                     .fontColor(UiPalette.TEXT_SECONDARY)
                     .onClick(() => {
                       this.noteStartDate = ''
@@ -247,8 +405,8 @@ struct Index {
                   dateValue: $noteEndDate
                 })
                 if (this.noteEndDate.length > 0) {
-                  Text('x')
-                    .fontSize(14)
+                  Text('✕')
+                    .fontSize(16)
                     .fontColor(UiPalette.TEXT_SECONDARY)
                     .onClick(() => {
                       this.noteEndDate = ''
@@ -260,7 +418,11 @@ struct Index {
 
               this.TagFilterBar()
             }
-            .padding({ left: UiConstants.PAGE_PADDING, right: UiConstants.PAGE_PADDING, bottom: 12 })
+            .padding({ left: 16, right: 16, top: 16, bottom: 16 })
+            .margin({ left: UiConstants.PAGE_PADDING, right: UiConstants.PAGE_PADDING, bottom: 12 })
+            .backgroundColor(UiPalette.SURFACE)
+            .borderRadius(20)
+            .shadow({ radius: 12, color: '#12CABFBF', offsetY: 6 })
 
             List({ space: 12 }) {
               ForEach(this.filterItems(false), (note: NoteCardViewData) => {
@@ -284,15 +446,16 @@ struct Index {
             .padding({ left: UiConstants.PAGE_PADDING, right: UiConstants.PAGE_PADDING, bottom: 80 })
           }
           .width('100%').height('100%')
+          .backgroundColor(UiPalette.PAGE_BACKGROUND)
 
           Button({ type: ButtonType.Circle, stateEffect: true }) {
-            Text('+').fontSize(32).fontColor(Color.White)
+            Text('+').fontSize(36).fontColor(UiPalette.TEXT_PRIMARY).fontWeight(FontWeight.Regular)
           }
-          .width(60)
-          .height(60)
-          .margin({ right: 20, bottom: 20 })
+          .width(64)
+          .height(64)
+          .margin({ right: 24, bottom: 24 })
           .backgroundColor(UiPalette.PRIMARY)
-          .shadow({ radius: 10, color: UiPalette.PRIMARY_SOFT, offsetY: 5 })
+          .shadow({ radius: 16, color: '#40FFB7C5', offsetY: 8 }) // 柔和透明的樱花粉阴影
           .onClick(() => {
             router.pushUrl({ url: 'pages/NoteEditPage' })
           })
@@ -304,28 +467,30 @@ struct Index {
         Stack({ alignContent: Alignment.BottomEnd }) {
           Column() {
             Column() {
-              Text('待办清单').fontSize(28).fontWeight(FontWeight.Bold)
-              Text('管理日程，高效每一天').fontSize(16).fontColor('#666').margin({ top: 8 })
+              Text('待办清单').fontSize(28).fontWeight(FontWeight.Bold).fontColor(UiPalette.TEXT_PRIMARY)
+              Text('规划日程，享受划掉任务的快乐').fontSize(16).fontColor(UiPalette.TEXT_SECONDARY).margin({ top: 8 })
             }
             .width('100%').alignItems(HorizontalAlign.Start).padding({ left: UiConstants.PAGE_PADDING, top: 40, bottom: 20 })
 
             Column({ space: 12 }) {
               Stack({ alignContent: Alignment.End }) {
-                TextInput({ placeholder: '输入关键字搜索待办...', text: this.todoKeyword })
+                TextInput({ placeholder: '输入你想找的待办...', text: this.todoKeyword })
                   .width('100%')
-                  .height(44)
+                  .height(48)
                   .fontSize(UiConstants.BODY_SIZE)
                   .backgroundColor(UiPalette.SURFACE)
-                  .borderRadius(14)
-                  .padding({ left: 14, right: 40 })
+                  .borderRadius(999)
+                  .padding({ left: 20, right: 40 })
+                  .placeholderColor(UiPalette.TEXT_MUTED)
+                  .fontColor(UiPalette.TEXT_PRIMARY)
                   .onChange((value: string) => {
                     this.todoKeyword = value
                   })
                 if (this.todoKeyword.length > 0) {
-                  Text('x')
-                    .fontSize(16)
+                  Text('✕')
+                    .fontSize(18)
                     .fontColor(UiPalette.TEXT_SECONDARY)
-                    .margin({ right: 14 })
+                    .margin({ right: 16 })
                     .onClick(() => {
                       this.todoKeyword = ''
                     })
@@ -338,8 +503,8 @@ struct Index {
                   dateValue: $todoStartDate
                 })
                 if (this.todoStartDate.length > 0) {
-                  Text('x')
-                    .fontSize(14)
+                  Text('✕')
+                    .fontSize(16)
                     .fontColor(UiPalette.TEXT_SECONDARY)
                     .onClick(() => {
                       this.todoStartDate = ''
@@ -352,8 +517,8 @@ struct Index {
                   dateValue: $todoEndDate
                 })
                 if (this.todoEndDate.length > 0) {
-                  Text('x')
-                    .fontSize(14)
+                  Text('✕')
+                    .fontSize(16)
                     .fontColor(UiPalette.TEXT_SECONDARY)
                     .onClick(() => {
                       this.todoEndDate = ''
@@ -365,7 +530,11 @@ struct Index {
 
               this.TagFilterBar()
             }
-            .padding({ left: UiConstants.PAGE_PADDING, right: UiConstants.PAGE_PADDING, bottom: 12 })
+            .padding({ left: 16, right: 16, top: 16, bottom: 16 })
+            .margin({ left: UiConstants.PAGE_PADDING, right: UiConstants.PAGE_PADDING, bottom: 12 })
+            .backgroundColor(UiPalette.SURFACE)
+            .borderRadius(20)
+            .shadow({ radius: 12, color: '#12CABFBF', offsetY: 6 })
 
             List({ space: 12 }) {
               ForEach(this.filterItems(true), (note: NoteCardViewData) => {
@@ -395,15 +564,16 @@ struct Index {
             .padding({ left: UiConstants.PAGE_PADDING, right: UiConstants.PAGE_PADDING, bottom: 80 })
           }
           .width('100%').height('100%')
+          .backgroundColor(UiPalette.PAGE_BACKGROUND)
 
           Button({ type: ButtonType.Circle, stateEffect: true }) {
-            Text('+').fontSize(32).fontColor(Color.White)
+            Text('+').fontSize(36).fontColor(UiPalette.TEXT_PRIMARY).fontWeight(FontWeight.Regular)
           }
-          .width(60)
-          .height(60)
-          .margin({ right: 20, bottom: 20 })
-          .backgroundColor(UiPalette.SUCCESS)
-          .shadow({ radius: 10, color: UiPalette.SUCCESS_SOFT, offsetY: 5 })
+          .width(64)
+          .height(64)
+          .margin({ right: 24, bottom: 24 })
+          .backgroundColor(UiPalette.SUCCESS) // 待办清单页用绿色按钮区分
+          .shadow({ radius: 16, color: '#40B5D5C5', offsetY: 8 })
           .onClick(() => {
             router.pushUrl({ url: 'pages/TodoDetailPage' })
           })
@@ -416,6 +586,6 @@ struct Index {
     })
     .width('100%')
     .height('100%')
-    .backgroundColor('#F1F3F5')
+    .backgroundColor(UiPalette.PAGE_BACKGROUND)
   }
 }

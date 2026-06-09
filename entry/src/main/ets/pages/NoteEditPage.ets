@@ -1,4 +1,5 @@
 import router from '@ohos.router'
+import promptAction from '@ohos.promptAction'
 import common from '@ohos.app.ability.common'
 import { CommonConstants, TodoVisualStatus, UiConstants, UiPalette } from '../common/Constants'
 import { NoteCard } from '../components/NoteCard'
@@ -25,11 +26,13 @@ export struct NoteEditPage {
   @State contentText: string = ''
   @State imagePath: string = ''
   @State selectedTags: string[] = []
+  @State aiSelectedTags: string[] = []
   @State aiTagsText: string = ''
   @State aiKeywordsText: string = ''
   @State aiSummary: string = ''
   @State aiActionItems: string = ''
   @State aiLoading: boolean = false
+  @State shouldSaveGeneratedTodo: boolean = false
   @State todoStatus: TodoVisualStatus = TodoVisualStatus.NONE
   @State helperText: string = ''
   @State showError: boolean = false
@@ -64,11 +67,12 @@ export struct NoteEditPage {
 
   private async loadInitialState(): Promise<void> {
     this.loading = true
+    this.shouldSaveGeneratedTodo = false
     this.noteId = this.readRouteNoteId()
     if (this.noteId.length === 0) {
       this.pageTitle = '新建笔记'
       this.createTime = Date.now()
-      this.contentText = '在这里记录灵感、课程安排或待办事项，保存后首页会自动刷新。'
+      this.contentText = ''
       this.selectedTags = ['学习']
       this.helperText = ''
       this.loading = false
@@ -94,6 +98,7 @@ export struct NoteEditPage {
         this.contentText = note.content
         this.imagePath = note.imagePath
         this.selectedTags = noteService.parseTags(note.tags)
+        this.aiSelectedTags = noteService.parseTags(note.aiTags || '')
         this.aiTagsText = note.aiTags || ''
         this.aiSummary = note.summary || ''
         this.aiActionItems = note.actionItems || ''
@@ -125,6 +130,7 @@ export struct NoteEditPage {
     const exists = this.selectedTags.indexOf(label) >= 0
     if (exists) {
       this.selectedTags = this.selectedTags.filter((item: string) => item !== label)
+      this.removeAiTagSelection(label)
       return
     }
     this.selectedTags = [...this.selectedTags, label]
@@ -146,6 +152,7 @@ export struct NoteEditPage {
 
   private removeTag(label: string): void {
     this.selectedTags = this.selectedTags.filter((tag: string) => tag !== label)
+    this.removeAiTagSelection(label)
   }
 
   private getCustomSelectedTags(): string[] {
@@ -170,12 +177,46 @@ export struct NoteEditPage {
       title: this.titleText,
       content: this.contentText,
       imagePath: this.imagePath,
-      tags: [...this.selectedTags, ...this.parseCustomTags()],
-      todoStatus: this.todoStatus,
+      tags: this.selectedTags,
+      aiTags: this.aiSelectedTags,
+      todoStatus: TodoVisualStatus.NONE,
       summary: this.aiSummary,
       actionItems: this.aiActionItems,
       priority: this.aiKeywordsText.length > 0 ? 1 : 0
     }
+  }
+
+  private buildGeneratedTodoInputs(): NoteEditorInput[] {
+    const actionLines = this.getGeneratedTodoLines()
+    if (actionLines.length === 0) {
+      let input: NoteEditorInput = {
+        title: this.getGeneratedTodoTitle(),
+        content: this.getGeneratedTodoContent(),
+        imagePath: '',
+        tags: this.selectedTags,
+        aiTags: this.aiSelectedTags,
+        todoStatus: TodoVisualStatus.PENDING,
+        summary: this.aiSummary,
+        actionItems: this.aiActionItems,
+        priority: this.aiKeywordsText.length > 0 ? 1 : 0
+      }
+      return [input]
+    }
+
+    return actionLines.map((action: string): NoteEditorInput => {
+      let input: NoteEditorInput = {
+        title: action,
+        content: action,
+        imagePath: '',
+        tags: this.selectedTags,
+        aiTags: this.aiSelectedTags,
+        todoStatus: TodoVisualStatus.PENDING,
+        summary: this.aiSummary,
+        actionItems: action,
+        priority: this.aiKeywordsText.length > 0 ? 1 : 0
+      }
+      return input
+    })
   }
 
   private parseCustomTags(): string[] {
@@ -188,6 +229,69 @@ export struct NoteEditPage {
       .filter((tag: string) => tag.length > 0)
   }
 
+  private applyAiTagSelection(nextAiTags: string[]): void {
+    const manualTags = this.selectedTags.filter((tag: string) => this.aiSelectedTags.indexOf(tag) < 0)
+    this.aiSelectedTags = nextAiTags
+    this.aiTagsText = nextAiTags.join(', ')
+    this.selectedTags = [...manualTags]
+    nextAiTags.forEach((tag: string) => {
+      if (this.selectedTags.indexOf(tag) < 0) {
+        this.selectedTags = [...this.selectedTags, tag]
+      }
+    })
+  }
+
+  private removeAiTagSelection(label: string): void {
+    if (this.aiSelectedTags.indexOf(label) < 0) {
+      return
+    }
+    this.aiSelectedTags = this.aiSelectedTags.filter((tag: string) => tag !== label)
+    this.aiTagsText = this.aiSelectedTags.join(', ')
+  }
+
+  private getGeneratedTodoTitle(): string {
+    const actionLines = this.getGeneratedTodoLines()
+    if (actionLines.length > 0) {
+      return actionLines[0]
+    }
+    const noteTitle = this.titleText.trim()
+    return noteTitle.length > 0 ? `${noteTitle} 待办` : 'AI 生成待办'
+  }
+
+  private getGeneratedTodoContent(): string {
+    const actionText = this.aiActionItems.trim()
+    if (actionText.length > 0) {
+      return actionText
+    }
+    const summaryText = this.aiSummary.trim()
+    if (summaryText.length > 0) {
+      return summaryText
+    }
+    return this.contentText.trim()
+  }
+
+  private getGeneratedTodoLines(): string[] {
+    return this.aiActionItems
+      .split(/[；;。\n\r]/)
+      .map((item: string) => item.trim())
+      .filter((item: string) => item.length > 0)
+  }
+
+  private canGenerateTodo(): boolean {
+    return this.getGeneratedTodoContent().length > 0
+  }
+
+  private toggleGeneratedTodo(): void {
+    if (!this.shouldSaveGeneratedTodo && !this.canGenerateTodo()) {
+      this.showError = true
+      this.helperText = '请先生成或填写待办/行动项，再保存待办事项。'
+      return
+    }
+    this.showError = false
+    this.shouldSaveGeneratedTodo = !this.shouldSaveGeneratedTodo
+    this.helperText = this.shouldSaveGeneratedTodo ? '当前会在保存笔记时同步创建一条待办事项。' : ''
+  }
+
   private async applyLocalAi(): Promise<void> {
     this.aiLoading = true
     this.showError = false
@@ -197,12 +301,10 @@ export struct NoteEditPage {
         throw new Error('笔记服务未初始化')
       }
       const aiResult = await noteService.generateLocalAiSuggestion(this.titleText, this.contentText)
-      this.aiTagsText = aiResult.suggestedTags.join(', ')
+      this.applyAiTagSelection(aiResult.suggestedTags)
       this.aiKeywordsText = aiResult.keywords.join(', ')
       this.aiSummary = aiResult.summary
       this.aiActionItems = aiResult.actionItems.join('；')
-      this.todoStatus = aiResult.todoStatus
-      this.selectedTags = [...aiResult.suggestedTags]
       this.helperText = '本地 AI 推荐已生成，可以继续编辑后保存。'
     } catch (error) {
       this.showError = true
@@ -223,13 +325,16 @@ export struct NoteEditPage {
       }
       const cloudResult = await noteService.requestCloudAiReview(this.titleText, this.contentText)
       this.aiSummary = cloudResult.summary
+      this.aiKeywordsText = cloudResult.keywords.join(', ')
       this.aiActionItems = cloudResult.actionItems.join('；')
-      this.aiTagsText = cloudResult.suggestedTags.join(', ')
+      this.applyAiTagSelection(cloudResult.suggestedTags)
       this.helperText = '云端 AI 整理完成，可以编辑后保存。'
+      promptAction.showToast({ message: '云端大模型调用成功！' })
     } catch (error) {
+      const errMsg = error instanceof Error ? error.message : JSON.stringify(error);
       this.showError = true
-      this.helperText = '云端 AI 请求失败，请稍后重试。'
-      Logger.error('NoteEditPage', `Cloud AI failed: ${JSON.stringify(error)}`)
+      this.helperText = `云端 AI 请求失败: ${errMsg}`
+      Logger.error('NoteEditPage', `Cloud AI failed: ${errMsg}`)
     } finally {
       this.aiLoading = false
     }
@@ -283,6 +388,12 @@ export struct NoteEditPage {
         const note = await noteService.updateNote(this.noteId, editorInput)
         this.createTime = note.createTime
       }
+      if (this.shouldSaveGeneratedTodo) {
+        const todoInputs = this.buildGeneratedTodoInputs()
+        for (const input of todoInputs) {
+          await noteService.createNote(input)
+        }
+      }
       router.replaceUrl({
         url: CommonConstants.PAGE_INDEX,
         params: {
@@ -293,6 +404,39 @@ export struct NoteEditPage {
       this.showError = true
       this.helperText = '保存失败，请稍后重试。'
       Logger.error('NoteEditPage', `Failed to save note: ${JSON.stringify(error)}`)
+    } finally {
+      this.saving = false
+    }
+  }
+
+  private async deleteNote(): Promise<void> {
+    if (this.noteId.length === 0) {
+      router.back()
+      return
+    }
+
+    const noteService = this.noteService
+    if (noteService === null) {
+      this.showError = true
+      this.helperText = '笔记服务初始化失败。'
+      return
+    }
+
+    this.saving = true
+    this.showError = false
+    this.helperText = ''
+    try {
+      await noteService.deleteNote(this.noteId)
+      router.replaceUrl({
+        url: CommonConstants.PAGE_INDEX,
+        params: {
+          refreshAt: Date.now().toString()
+        }
+      })
+    } catch (error) {
+      this.showError = true
+      this.helperText = '删除失败，请稍后重试。'
+      Logger.error('NoteEditPage', `Failed to delete note: ${JSON.stringify(error)}`)
     } finally {
       this.saving = false
     }
@@ -365,7 +509,7 @@ export struct NoteEditPage {
               .fontWeight(FontWeight.Medium)
               .fontColor(UiPalette.TEXT_PRIMARY)
 
-            TextArea({ placeholder: '输入正文内容', text: this.contentText })
+            TextArea({ placeholder: this.contentText.length > 0 ? '' : '在这里记录灵感、课程安排或待办事项，保存后首页会自动刷新。', text: this.contentText })
               .width('100%')
               .height(180)
               .fontSize(UiConstants.BODY_SIZE)
@@ -436,6 +580,7 @@ export struct NoteEditPage {
               .padding({ left: 14, right: 14 })
               .onChange((value: string) => {
                 this.aiTagsText = value
+                this.applyAiTagSelection(this.parseCustomTags())
               })
 
             Text('AI 生成摘要')
@@ -466,6 +611,17 @@ export struct NoteEditPage {
               .padding(14)
               .onChange((value: string) => {
                 this.aiActionItems = value
+              })
+
+            Button(this.shouldSaveGeneratedTodo ? '取消保存待办事项' : '保存待办事项')
+              .width('100%')
+              .height(44)
+              .fontSize(UiConstants.BODY_SIZE)
+              .fontColor(this.shouldSaveGeneratedTodo ? Color.White : UiPalette.TEXT_PRIMARY)
+              .backgroundColor(this.shouldSaveGeneratedTodo ? UiPalette.SUCCESS : UiPalette.SURFACE_MUTED)
+              .borderRadius(UiConstants.BUTTON_RADIUS)
+              .onClick(() => {
+                this.toggleGeneratedTodo()
               })
           }
           .alignItems(HorizontalAlign.Start)
@@ -641,6 +797,21 @@ export struct NoteEditPage {
               }
             })
 
+          if (this.noteId.length > 0) {
+            Button(this.saving ? '正在处理...' : '删除笔记')
+              .width('100%')
+              .height(52)
+              .fontSize(UiConstants.BODY_SIZE)
+              .fontColor(Color.White)
+              .backgroundColor(UiPalette.DANGER)
+              .borderRadius(UiConstants.BUTTON_RADIUS)
+              .onClick(() => {
+                if (!this.saving) {
+                  void this.deleteNote()
+                }
+              })
+          }
+
           if (!this.showError && this.helperText.length > 0) {
             Text(this.helperText)
               .fontSize(UiConstants.CAPTION_SIZE)
@@ -659,8 +830,23 @@ export struct NoteEditPage {
               dateText: this.getPreviewDate(),
               imagePath: this.imagePath,
               tags: this.selectedTags,
-              todoStatus: this.todoStatus
+              todoStatus: TodoVisualStatus.NONE
             })
+
+            if (this.shouldSaveGeneratedTodo) {
+              Text('待办事项预览')
+                .fontSize(UiConstants.CAPTION_SIZE)
+                .fontColor(UiPalette.TEXT_SECONDARY)
+
+              NoteCard({
+                title: this.getGeneratedTodoTitle(),
+                content: this.getGeneratedTodoContent(),
+                dateText: this.getPreviewDate(),
+                imagePath: '',
+                tags: this.selectedTags,
+                todoStatus: TodoVisualStatus.PENDING
+              })
+            }
           }
           .alignItems(HorizontalAlign.Start)
           .width('100%')

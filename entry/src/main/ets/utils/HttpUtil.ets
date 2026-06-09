@@ -43,12 +43,12 @@ export class HttpUtil {
         header: requestHeaders,
         extraData: JSON.stringify(data),
         expectDataType: http.HttpDataType.STRING,
-        readTimeout: 10000,
-        connectTimeout: 10000
+        readTimeout: 60000,
+        connectTimeout: 60000
       })
 
       if (response.responseCode < 200 || response.responseCode >= 300) {
-        throw new Error(`HTTP ${response.responseCode}`)
+        throw new Error(`HTTP ${response.responseCode}: ${String(response.result)}`)
       }
 
       return String(response.result)
