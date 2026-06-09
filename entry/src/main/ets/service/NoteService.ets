@@ -86,6 +86,30 @@ export class NoteService {
   private readonly rdbStoreManager: RdbStoreManager
   private readonly context: common.Context
 
+  // 停用词列表（过滤无意义的关键词）
+  private readonly stopWords: string[] = [
+    // 动词
+    '记得', '需要', '得', '去', '要', '把', '将', '是', '有', '在', '会', '能', '可以',
+    '做', '做', '来', '去', '说', '看', '想', '走', '让', '用', '给', '问', '找',
+    // 助词
+    '的', '了', '着', '过', '地', '得',
+    // 代词
+    '我', '你', '他', '她', '它', '我们', '你们', '他们', '自己', '这个', '那个', '什么',
+    // 介词
+    '从', '到', '向', '对', '被', '比', '跟',
+    // 连词
+    '和', '与', '或', '但', '而', '又', '还', '也',
+    // 副词
+    '很', '非常', '太', '最', '更', '就', '才', '都', '不', '没', '没有',
+    // 无意义片段
+    '得买', '得做', '得去', '得说', '得看', '得想', '得走', '得用', '得给',
+    '要买', '要做', '要去', '要说', '要看', '要想', '要走', '要用', '要给',
+    '需要买', '需要做', '需要去', '需要说', '需要看', '需要想',
+    // 其他常见无意义词
+    '一下', '一些', '一点', '一个', '这个', '那个', '什么', '怎么', '为什么',
+    '因为', '所以', '如果', '虽然', '但是', '然而', '因此'
+  ]
+
   // 分层标签体系（50+个标签）
   private readonly tagCategories: string[] = ['工作', '学习', '生活', '开发', '管理', '文档', '财务', '健康']
 
@@ -519,11 +543,15 @@ export class NoteService {
       }
     }
 
-    // 3. 提取关键词作为候选标签
+    // 3. 提取关键词作为候选标签（过滤停用词）
     const keywords = this.extractKeywords(text, 8)
     for (let i = 0; i < keywords.length; i++) {
       const keyword = keywords[i]
-      if (keyword.length >= 2 && !tagScores.has(keyword)) {
+      // 过滤条件：长度>=2、不在停用词中、不在已有标签中、不是纯数字
+      if (keyword.length >= 2 &&
+          !this.stopWords.includes(keyword) &&
+          !tagScores.has(keyword) &&
+          !/^\d+$/.test(keyword)) {
         // 关键词权重递减
         tagScores.set(keyword, 3 - i * 0.3)
       }
