@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_library(text_analyzer SHARED
     text_analyzer.cpp
+    crypto_utils.cpp
     napi_init.cpp
 )
 
