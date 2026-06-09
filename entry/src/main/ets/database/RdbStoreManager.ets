@@ -161,15 +161,51 @@ export class RdbStoreManager {
   }
 
   async updateNoteCompleteStatus(noteId: string, isDone: boolean) {
+    const status = isDone ? TodoVisualStatus.COMPLETED : TodoVisualStatus.PENDING
+    return await this.updateNoteTodoStatus(noteId, status)
+  }
+
+  async updateNoteTodoStatus(noteId: string, status: TodoVisualStatus) {
     if (!this.store) {
       return
     }
-    const valueBucket: relationalStore.ValuesBucket = {
-      isTodo: isDone ? 0 : 1
+
+    const noteValueBucket: relationalStore.ValuesBucket = {
+      isTodo: this.mapVisualStatusToIsTodo(status)
     }
-    const predicates = new relationalStore.RdbPredicates(CommonConstants.TABLE_NOTES)
-    predicates.equalTo('id', noteId)
-    return await this.store.update(valueBucket, predicates)
+    const notePredicates = new relationalStore.RdbPredicates(CommonConstants.TABLE_NOTES)
+    notePredicates.equalTo('id', noteId)
+    await this.store.update(noteValueBucket, notePredicates)
+
+    const todoPredicates = new relationalStore.RdbPredicates(CommonConstants.TABLE_TODOS)
+    todoPredicates.equalTo('noteId', noteId)
+    const existingTodo = await this.store.query(todoPredicates)
+    const hasTodoRow = existingTodo.goToFirstRow()
+    existingTodo.close()
+
+    if (status === TodoVisualStatus.NONE) {
+      if (hasTodoRow) {
+        return await this.store.delete(todoPredicates)
+      }
+      return
+    }
+
+    const todoValueBucket: relationalStore.ValuesBucket = {
+      status: this.mapVisualStatusToTodoStatus(status)
+    }
+
+    if (hasTodoRow) {
+      return await this.store.update(todoValueBucket, todoPredicates)
+    }
+
+    const todoBucket: relationalStore.ValuesBucket = {
+      id: `todo-${noteId}`,
+      noteId,
+      status: this.mapVisualStatusToTodoStatus(status),
+      deadline: 0,
+      priority: 0
+    }
+    return await this.store.insert(CommonConstants.TABLE_TODOS, todoBucket)
   }
 
   private mapResultSetToNotes(resultSet: relationalStore.ResultSet): Note[] {
@@ -218,6 +254,33 @@ export class RdbStoreManager {
     }
   }
 
+  private mapVisualStatusToIsTodo(status: TodoVisualStatus): number {
+    switch (status) {
+      case TodoVisualStatus.PENDING:
+        return 1
+      case TodoVisualStatus.COMPLETED:
+        return 0
+      case TodoVisualStatus.DEFERRED:
+        return 2
+      case TodoVisualStatus.NONE:
+      default:
+        return -1
+    }
+  }
+
+  private mapVisualStatusToTodoStatus(status: TodoVisualStatus): TodoStatus {
+    switch (status) {
+      case TodoVisualStatus.COMPLETED:
+        return TodoStatus.DONE
+      case TodoVisualStatus.DEFERRED:
+        return TodoStatus.ARCHIVED
+      case TodoVisualStatus.PENDING:
+      case TodoVisualStatus.NONE:
+      default:
+        return TodoStatus.DEFAULT
+    }
+  }
+
   async insertTodo(todo: Todo) {
     if (!this.store) {
       return
@@ -252,5 +315,19 @@ export class RdbStoreManager {
     }
     resultSet.close()
     return null
+  }
+
+  async deleteNote(noteId: string) {
+    if (!this.store) {
+      return
+    }
+
+    const todoPredicates = new relationalStore.RdbPredicates(CommonConstants.TABLE_TODOS)
+    todoPredicates.equalTo('noteId', noteId)
+    await this.store.delete(todoPredicates)
+
+    const notePredicates = new relationalStore.RdbPredicates(CommonConstants.TABLE_NOTES)
+    notePredicates.equalTo('id', noteId)
+    return await this.store.delete(notePredicates)
   }
 }

@@ -168,11 +168,13 @@ export struct NoteCard {
     .padding(16)
     .backgroundColor(UiPalette.SURFACE)
     .borderRadius(UiConstants.CARD_RADIUS)
+    .borderWidth(1)
+    .borderColor(UiPalette.BORDER)
     .shadow({
       radius: UiConstants.CARD_SHADOW_RADIUS,
-      color: '#140F172A',
+      color: '#105C5454',
       offsetX: 0,
-      offsetY: 8
+      offsetY: 6
     })
   }
 }

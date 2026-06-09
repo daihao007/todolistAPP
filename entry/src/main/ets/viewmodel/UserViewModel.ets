@@ -4,12 +4,21 @@ import { PreferenceUtil } from '../utils/PreferenceUtil';
 import common from '@ohos.app.ability.common';
 
 export class UserViewModel {
+  private getNicknameKey(user: string): string {
+    return `NICKNAME_${user}`;
+  }
+
   /**
    * 注册逻辑
    */
-  async register(context: common.Context, user: string, pass: string) {
+  async register(context: common.Context, user: string, pass: string, nickname: string) {
+    const safeNickname = nickname.trim();
     if (user.length < 3 || pass.length < 3) {
       promptAction.showToast({ message: '账号密码长度需大于3位' });
+      return false;
+    }
+    if (safeNickname.length === 0) {
+      promptAction.showToast({ message: '请输入昵称' });
       return false;
     }
 
@@ -23,6 +32,7 @@ export class UserViewModel {
 
     // 2. 存储账号密码
     await PreferenceUtil.putString(context, user, pass);
+    await PreferenceUtil.putString(context, this.getNicknameKey(user), safeNickname);
     await PreferenceUtil.putString(context, 'CURRENT_USER', user);
     promptAction.showToast({ message: '注册成功！' });
     router.replaceUrl({ url: 'pages/Index' });

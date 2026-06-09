@@ -21,8 +21,9 @@ export class CommonConstants {
   static readonly PAGE_SEARCH: string = 'pages/SearchResultPage'
 
   static readonly DEFAULT_TAGS: string[] = ['工作', '学习', '生活']
-  static readonly AI_CLOUD_API_URL: string = 'https://your-cloud-ai-endpoint.example.com/analyze'
-  static readonly AI_CLOUD_API_KEY: string = ''
+  static readonly AI_CLOUD_API_URL: string = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions'
+  static readonly AI_CLOUD_API_KEY: string = 'sk-576671c9511a427186ea9eaac0d3a9ef'
+  static readonly AI_CLOUD_MODEL: string = 'qwen3.5-122b-a10b'
 }
 
 export enum TodoVisualStatus {
@@ -33,39 +34,39 @@ export enum TodoVisualStatus {
 }
 
 export class UiConstants {
-  static readonly PAGE_PADDING: number = 16
-  static readonly CARD_RADIUS: number = 20
+  static readonly PAGE_PADDING: number = 20
+  static readonly CARD_RADIUS: number = 24
   static readonly CHIP_RADIUS: number = 12
-  static readonly BUTTON_RADIUS: number = 16
-  static readonly SECTION_SPACING: number = 16
+  static readonly BUTTON_RADIUS: number = 999
+  static readonly SECTION_SPACING: number = 24
   static readonly CONTENT_SPACING: number = 12
-  static readonly TITLE_SIZE: number = 20
-  static readonly SUBTITLE_SIZE: number = 16
-  static readonly BODY_SIZE: number = 14
+  static readonly TITLE_SIZE: number = 24
+  static readonly SUBTITLE_SIZE: number = 18
+  static readonly BODY_SIZE: number = 15
   static readonly CAPTION_SIZE: number = 12
-  static readonly CARD_SHADOW_RADIUS: number = 18
+  static readonly CARD_SHADOW_RADIUS: number = 24
 }
 
 export class UiPalette {
-  static readonly PAGE_BACKGROUND: string = '#F6F7FB'
+  static readonly PAGE_BACKGROUND: string = '#FDFBFA' // 奶泡白
   static readonly SURFACE: string = '#FFFFFF'
-  static readonly SURFACE_MUTED: string = '#F0F3FA'
-  static readonly PRIMARY: string = '#2F6BFF'
-  static readonly PRIMARY_SOFT: string = '#E8EEFF'
-  static readonly ACCENT: string = '#23B18A'
-  static readonly TEXT_PRIMARY: string = '#1F2430'
-  static readonly TEXT_SECONDARY: string = '#667085'
-  static readonly TEXT_MUTED: string = '#98A2B3'
-  static readonly BORDER: string = '#E4E7EC'
-  static readonly WARNING: string = '#FFB020'
-  static readonly WARNING_SOFT: string = '#FFF3D6'
-  static readonly SUCCESS: string = '#12B76A'
-  static readonly SUCCESS_SOFT: string = '#DCFCE7'
-  static readonly DANGER: string = '#F04438'
-  static readonly DANGER_SOFT: string = '#FEE4E2'
-  static readonly TAG_WORK: string = '#EEF4FF'
-  static readonly TAG_STUDY: string = '#ECFDF3'
-  static readonly TAG_LIFE: string = '#FFF1F3'
+  static readonly SURFACE_MUTED: string = '#F8F3F0' // 燕麦色
+  static readonly PRIMARY: string = '#FFB7C5' // 樱花奶冻粉
+  static readonly PRIMARY_SOFT: string = '#FFECF0' 
+  static readonly ACCENT: string = '#D1C4E9' // 香芋奶紫
+  static readonly TEXT_PRIMARY: string = '#5C5454' // 摩卡深褐
+  static readonly TEXT_SECONDARY: string = '#A39E9E' // 奶茶灰
+  static readonly TEXT_MUTED: string = '#CABFBF' 
+  static readonly BORDER: string = '#E8E2D9' // 浅杏色
+  static readonly WARNING: string = '#FFB885' // 芝士橙
+  static readonly WARNING_SOFT: string = '#FFF2E8'
+  static readonly SUCCESS: string = '#B5D5C5' // 薄荷海盐绿
+  static readonly SUCCESS_SOFT: string = '#E6F2EC'
+  static readonly DANGER: string = '#FAACA8' // 西柚红
+  static readonly DANGER_SOFT: string = '#FDEAE9'
+  static readonly TAG_WORK: string = '#E3F2FD' // 冰蓝底色
+  static readonly TAG_STUDY: string = '#F3E5F5' // 香芋底色
+  static readonly TAG_LIFE: string = '#FFF3E0' // 芝士黄底色
 }
 
 export class UiCopywriting {
