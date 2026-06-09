@@ -105,6 +105,7 @@ export class NoteService {
     '得买', '得做', '得去', '得说', '得看', '得想', '得走', '得用', '得给',
     '要买', '要做', '要去', '要说', '要看', '要想', '要走', '要用', '要给',
     '需要买', '需要做', '需要去', '需要说', '需要看', '需要想',
+    '天记', '明天记', '天记得', '记得买', '得买', '买咖', '买咖啡', '得买咖',
     // 其他常见无意义词
     '一下', '一些', '一点', '一个', '这个', '那个', '什么', '怎么', '为什么',
     '因为', '所以', '如果', '虽然', '但是', '然而', '因此'
@@ -126,7 +127,7 @@ export class NoteService {
   private readonly synonymKeys: string[] = [
     '开会', '开个会', '站会', '周会', '例会', '晨会', '早会', '夕会', '周例会', '月会',
     '上课', '听课', '培训', '学习会',
-    '买东西', '采购', '下单', '购物',
+    '买东西', '采购', '下单', '购物', '买', '购',
     '修bug', '修Bug', '修复bug', '修复Bug', '解bug',
     '发布', '上线发布', '发版',
     '联调', '对接', '联调测试',
@@ -145,7 +146,7 @@ export class NoteService {
   private readonly synonymValues: string[] = [
     '会议', '会议', '会议', '会议', '会议', '会议', '会议', '会议', '会议', '会议',
     '课程', '课程', '课程', '课程',
-    '购物', '购物', '购物', '购物',
+    '购物', '购物', '购物', '购物', '购物', '购物',
     'Bug', 'Bug', 'Bug', 'Bug', 'Bug',
     '上线', '上线', '上线',
     '接口', '接口', '接口',
@@ -541,17 +542,27 @@ export class NoteService {
           tagScores.set(tags[j], currentScore + 1)
         }
       }
+      // 同义词或直接匹配到该类别下的标签，推断类别标签
+      for (let j = 0; j < tags.length; j++) {
+        if (tagScores.has(tags[j])) {
+          const categoryScore = tagScores.get(category) || 0
+          tagScores.set(category, Math.max(categoryScore, 2))
+          break
+        }
+      }
     }
 
-    // 3. 提取关键词作为候选标签（过滤停用词）
+    // 3. 提取关键词作为候选标签（过滤停用词和无意义片段）
     const keywords = this.extractKeywords(text, 8)
     for (let i = 0; i < keywords.length; i++) {
       const keyword = keywords[i]
-      // 过滤条件：长度>=2、不在停用词中、不在已有标签中、不是纯数字
+      // 过滤条件：长度>=2、不在停用词中、不在已有标签中、不是纯数字、不包含停用词、不是时间词
       if (keyword.length >= 2 &&
           !this.stopWords.includes(keyword) &&
           !tagScores.has(keyword) &&
-          !/^\d+$/.test(keyword)) {
+          !/^\d+$/.test(keyword) &&
+          !this.containsStopWord(keyword) &&
+          !this.isTimeWord(keyword)) {
         // 关键词权重递减
         tagScores.set(keyword, 3 - i * 0.3)
       }
@@ -573,6 +584,39 @@ export class NoteService {
       result.push(entries[i][0])
     }
     return result
+  }
+
+  // 检查关键词是否包含停用词（用于过滤n-gram无意义片段）
+  private containsStopWord(keyword: string): boolean {
+    for (let i = 0; i < this.stopWords.length; i++) {
+      const sw = this.stopWords[i]
+      // 多字符停用词：检查是否为关键词的子串
+      if (sw.length >= 2 && keyword.indexOf(sw) >= 0) {
+        return true
+      }
+      // 反向检查：2字关键词是否为多字符停用词的子串（如"天记"是"记得"的子串）
+      if (sw.length >= 2 && keyword.length >= 2 && sw.indexOf(keyword) >= 0) {
+        return true
+      }
+      // 单字符停用词：检查2字关键词的首字（n-gram跨词边界产生的片段，如"买咖"）
+      if (sw.length === 1 && keyword.length === 2 && keyword.charAt(0) === sw) {
+        return true
+      }
+    }
+    return false
+  }
+
+  // 检查关键词是否为时间词（避免将时间词作为标签）
+  private isTimeWord(keyword: string): boolean {
+    const timeWords = ['今天', '明天', '后天', '大后天', '昨天', '前天',
+      '下周一', '下周二', '下周三', '下周四', '下周五', '下周六', '下周日',
+      '本周', '这周', '上周', '月底', '年底', '下个月', '周末']
+    for (let i = 0; i < timeWords.length; i++) {
+      if (keyword === timeWords[i]) {
+        return true
+      }
+    }
+    return false
   }
 
   private extractKeywords(text: string, topK: number = 5): string[] {
@@ -777,20 +821,6 @@ export class NoteService {
       if (items.length >= 5) break
       if (items.indexOf(action) < 0) {
         items.push(action)
-      }
-    }
-
-    // 回退逻辑：如果还是没有，尝试从句子中提取
-    if (items.length === 0) {
-      const fallbackSentences = this.splitToSentences(text)
-      for (const sentence of fallbackSentences) {
-        const normalizedSentence = this.normalizeActionItem(sentence)
-        if (normalizedSentence.length > 0 && normalizedSentence.length >= 6 && items.indexOf(normalizedSentence) < 0) {
-          items.push(normalizedSentence)
-        }
-        if (items.length >= 3) {
-          break
-        }
       }
     }
 
