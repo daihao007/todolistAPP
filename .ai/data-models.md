@@ -141,8 +141,12 @@ class NoteCardViewData {
 
 ## 偏好存储 (PreferenceUtil)
 
+Preferences 文件名：`app_settings`
+
 | Key | 类型 | 说明 |
 |-----|------|------|
-| `user_{account}_password` | string | 用户密码 |
-| `user_{account}_nickname` | string | 用户昵称 |
-| `current_user` | string | 当前登录用户账号 |
+| `{account}` | string | 用户密码记录，当前格式为 `{64位SHA-256哈希}:{32位hex盐值}`；旧版明文密码在首次正确登录后自动迁移 |
+| `NICKNAME_{account}` | string | 用户昵称 |
+| `CURRENT_USER` | string | 当前登录用户账号 |
+
+密码哈希由 Native C++ 模块生成：`NativeCrypto.generateSalt()` 生成 16 字节随机盐，`NativeCrypto.hashPassword(password, salt)` 对 `password + salt` 计算 SHA-256，登录时通过 `NativeCrypto.verifyPassword()` 重新计算并比较。

@@ -6,9 +6,9 @@
 |------|-----------|
 | **平台** | HarmonyOS (鸿蒙) |
 | **SDK** | 6.0.2 (API 22) |
-| **开发语言** | ArkTS (TypeScript 方言) |
+| **开发语言** | ArkTS (TypeScript 方言)、C++ |
 | **UI 框架** | ArkUI (声明式组件) |
-| **构建工具** | Hvigor |
+| **构建工具** | Hvigor、CMake/Ninja |
 | **运行模式** | Stage Mode |
 
 ## 核心依赖
@@ -23,6 +23,15 @@
 | `@ohos.file.picker` | 文件选择器 (PhotoViewPicker) |
 | `@ohos.abilityAccessCtrl` | 权限管理 |
 | `@ohos.hilog` | 日志系统 |
+
+### Native 能力
+
+| 模块 | 用途 |
+|------|------|
+| NAPI | ArkTS 与 C++ 共享库通信 |
+| `libtext_analyzer.so` | Native 共享库，暴露文本分析和密码加密函数 |
+| `crypto_utils.cpp` | SHA-256 密码哈希、随机盐值生成、密码验证 |
+| `text_analyzer.cpp` | Native 关键词提取和句子评分 |
 
 ### 测试框架
 
