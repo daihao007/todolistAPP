@@ -27,7 +27,7 @@ export interface AiSuggestion {
   todoStatus: TodoVisualStatus
   priority: number
   timeInfo: string  // 提取的时间信息，如"明天"、"下周五"
-  priorityLevel: 'high' | 'medium' | 'low' | 'none'  // 优先级级别
+  priorityLevel: string  // 优先级级别: 'high' | 'medium' | 'low' | 'none'
 }
 
 export interface CloudAiResult {
@@ -72,71 +72,86 @@ interface SummarySentenceScore {
   score: number
 }
 
+interface TimePattern {
+  regex: RegExp
+  result: string
+}
+
+interface ImplicitActionPattern {
+  regex: RegExp
+  template: string
+}
+
 export class NoteService {
   private readonly rdbStoreManager: RdbStoreManager
   private readonly context: common.Context
 
-  // 同义词映射表
-  private readonly synonymMap: Record<string, string> = {
-    '开会': '会议', '开个会': '会议', '开个短会': '会议', '站会': '会议',
-    '上课': '课程', '听课': '课程', '培训': '课程',
-    '买东西': '购物', '采购': '购物', '下单': '购物',
-    'bug': 'Bug', '修bug': 'Bug', '修Bug': 'Bug', '修 bug': 'Bug',
-    '发布': '上线', '部署': '上线', '上线发布': '上线',
-    '联调': '接口', '对接': '接口', '联调测试': '接口',
-    '写代码': '开发', '编码': '开发', '撸代码': '开发',
-    '写文档': '文档', '写需求': '文档', '写PRD': '文档',
-    '排期': '计划', '做计划': '计划', '定计划': '计划',
-    '复盘': '总结', '回顾': '总结',
-    '汇报': '周报', '写周报': '周报', '周报总结': '周报',
-    '健身': '运动', '锻炼': '运动', '跑步': '运动',
-    '做饭': '饮食', '点外卖': '饮食', '吃饭': '饮食',
-    'debug': 'Bug', '调试': 'Bug',
-    'review': '评审', '代码评审': '评审', 'CR': '评审',
-    '需求评审': '评审', '方案评审': '评审',
-    '同步': '沟通', '对齐': '沟通', '拉通': '沟通',
-    '跟进': '任务', '追踪': '任务', '推动': '任务'
-  }
-
   // 分层标签体系（50+个标签）
-  private readonly tagHierarchy: Record<string, string[]> = {
-    '工作': ['会议', '项目', '产品', '评审', '需求', '排期', '上线', '复盘', '周报', '汇报', '沟通', '协调'],
-    '学习': ['课程', '考试', '论文', '调研', '技术', '算法', '框架', '源码', '笔记', '读书', '培训'],
-    '生活': ['购物', '旅行', '健身', '饮食', '娱乐', '社交', '家务', '维修', '运动', '电影', '音乐'],
-    '开发': ['Bug', '测试', '部署', '数据库', '接口', '优化', '重构', '迁移', '开发', '前端', '后端', 'API'],
-    '管理': ['计划', '任务', '排期', '跟进', '协调', '分配', '验收', '目标', 'KPI', 'OKR'],
-    '文档': ['文档', '需求', 'PRD', '方案', '设计', '架构', '流程图', 'UML'],
-    '财务': ['报销', '预算', '成本', '收入', '支出', '账单'],
-    '健康': ['体检', '就医', '用药', '睡眠', '养生', '心理']
-  }
+  private readonly tagCategories: string[] = ['工作', '学习', '生活', '开发', '管理', '文档', '财务', '健康']
+
+  private readonly tagWork: string[] = ['会议', '项目', '产品', '评审', '需求', '排期', '上线', '复盘', '周报', '汇报', '沟通', '协调']
+  private readonly tagStudy: string[] = ['课程', '考试', '论文', '调研', '技术', '算法', '框架', '源码', '笔记', '读书', '培训']
+  private readonly tagLife: string[] = ['购物', '旅行', '健身', '饮食', '娱乐', '社交', '家务', '维修', '运动', '电影', '音乐']
+  private readonly tagDev: string[] = ['Bug', '测试', '部署', '数据库', '接口', '优化', '重构', '迁移', '开发', '前端', '后端', 'API']
+  private readonly tagManage: string[] = ['计划', '任务', '排期', '跟进', '协调', '分配', '验收', '目标', 'KPI', 'OKR']
+  private readonly tagDoc: string[] = ['文档', '需求', 'PRD', '方案', '设计', '架构', '流程图', 'UML']
+  private readonly tagFinance: string[] = ['报销', '预算', '成本', '收入', '支出', '账单']
+  private readonly tagHealth: string[] = ['体检', '就医', '用药', '睡眠', '养生', '心理']
+
+  // 同义词映射表（使用两个数组模拟 Map）
+  private readonly synonymKeys: string[] = [
+    '开会', '开个会', '站会', '上课', '听课', '培训', '买东西', '采购', '下单',
+    '修bug', '修Bug', '发布', '部署', '联调', '对接', '写代码', '编码', '撸代码',
+    '写文档', '写需求', '排期', '做计划', '复盘', '回顾', '汇报', '写周报',
+    '健身', '锻炼', '跑步', '做饭', '点外卖', 'debug', '调试',
+    'review', '代码评审', 'CR', '需求评审', '同步', '对齐', '拉通', '跟进', '追踪', '推动'
+  ]
+  private readonly synonymValues: string[] = [
+    '会议', '会议', '会议', '课程', '课程', '课程', '购物', '购物', '购物',
+    'Bug', 'Bug', '上线', '上线', '接口', '接口', '开发', '开发', '开发',
+    '文档', '文档', '计划', '计划', '总结', '总结', '周报', '周报',
+    '运动', '运动', '运动', '饮食', '饮食', 'Bug', 'Bug',
+    '评审', '评审', '评审', '评审', '沟通', '沟通', '沟通', '任务', '任务', '任务'
+  ]
 
   // 时间提取模式
-  private readonly timePatterns: Array<{ regex: RegExp, handler: (match: RegExpMatchArray) => string }> = [
-    { regex: /今天|今日/, handler: () => '今天' },
-    { regex: /明天|明日/, handler: () => '明天' },
-    { regex: /后天/, handler: () => '后天' },
-    { regex: /大后天/, handler: () => '大后天' },
-    { regex: /下周一/, handler: () => '下周一' },
-    { regex: /下周二/, handler: () => '下周二' },
-    { regex: /下周三/, handler: () => '下周三' },
-    { regex: /下周四/, handler: () => '下周四' },
-    { regex: /下周五/, handler: () => '下周五' },
-    { regex: /下周六/, handler: () => '下周六' },
-    { regex: /下周日|下周天/, handler: () => '下周日' },
-    { regex: /这周|本周/, handler: () => '本周内' },
-    { regex: /月底/, handler: () => '月底前' },
-    { regex: /年底/, handler: () => '年底' },
-    { regex: /(\d{1,2})月(\d{1,2})[日号]/, handler: (m) => `${m[1]}月${m[2]}日` },
-    { regex: /下个月/, handler: () => '下个月' },
-    { regex: /下周/, handler: () => '下周' }
+  private readonly timePatterns: TimePattern[] = [
+    { regex: /今天|今日/, result: '今天' },
+    { regex: /明天|明日/, result: '明天' },
+    { regex: /后天/, result: '后天' },
+    { regex: /大后天/, result: '大后天' },
+    { regex: /下周一/, result: '下周一' },
+    { regex: /下周二/, result: '下周二' },
+    { regex: /下周三/, result: '下周三' },
+    { regex: /下周四/, result: '下周四' },
+    { regex: /下周五/, result: '下周五' },
+    { regex: /下周六/, result: '下周六' },
+    { regex: /下周日|下周天/, result: '下周日' },
+    { regex: /这周|本周/, result: '本周内' },
+    { regex: /月底/, result: '月底前' },
+    { regex: /年底/, result: '年底' },
+    { regex: /下个月/, result: '下个月' },
+    { regex: /下周/, result: '下周' },
+    { regex: /(\d{1,2})月(\d{1,2})[日号]/, result: '' }  // 特殊处理
   ]
 
   // 优先级关键词
-  private readonly priorityPatterns = {
-    high: ['紧急', '马上', '立即', 'ASAP', '尽快', '优先', '重要', '关键', '火速', '加急', '立刻', '火急'],
-    medium: ['尽快', '这周', '本周', '近期', '这两天', '早些'],
-    low: ['有空', '方便时', '后续', '以后', '不急', '慢慢', '空了']
-  }
+  private readonly highPriorityWords: string[] = ['紧急', '马上', '立即', 'ASAP', '尽快', '优先', '重要', '关键', '火速', '加急', '立刻', '火急']
+  private readonly mediumPriorityWords: string[] = ['尽快', '这周', '本周', '近期', '这两天', '早些']
+  private readonly lowPriorityWords: string[] = ['有空', '方便时', '后续', '以后', '不急', '慢慢', '空了']
+
+  // 隐含待办模式
+  private readonly implicitPatterns: ImplicitActionPattern[] = [
+    { regex: /(.+?)(?:有风险|存在风险|风险较高)/, template: '评估$1风险' },
+    { regex: /(.+?)(?:有问题|存在问题|出问题了)/, template: '排查$1问题' },
+    { regex: /(.+?)(?:还没完成|未完成|还没做|没做完)/, template: '完成$1' },
+    { regex: /(.+?)(?:需要优化|可以优化|待优化)/, template: '优化$1' },
+    { regex: /(.+?)(?:需要测试|待测试|还没测试)/, template: '测试$1' },
+    { regex: /(.+?)(?:需要确认|待确认|还不确定)/, template: '确认$1' },
+    { regex: /(.+?)(?:延期了|推迟了|延后了)/, template: '跟进$1进度' },
+    { regex: /(.+?)(?:超时了|超期了|逾期了)/, template: '处理$1超时问题' },
+    { regex: /(.+?)(?:卡住了|阻塞了|被阻塞)/, template: '解决$1阻塞问题' }
+  ]
 
   constructor(context: common.Context) {
     this.context = context
@@ -245,25 +260,29 @@ export class NoteService {
     for (const pattern of this.timePatterns) {
       const match = text.match(pattern.regex)
       if (match) {
-        return pattern.handler(match)
+        // 处理日期格式的特殊模式
+        if (pattern.result === '' && match.length >= 3 && match[1] !== undefined && match[2] !== undefined) {
+          return match[1] + '月' + match[2] + '日'
+        }
+        return pattern.result
       }
     }
     return ''
   }
 
   // 提取优先级级别
-  private extractPriorityLevel(text: string): 'high' | 'medium' | 'low' | 'none' {
-    for (const keyword of this.priorityPatterns.high) {
+  private extractPriorityLevel(text: string): string {
+    for (const keyword of this.highPriorityWords) {
       if (text.indexOf(keyword) >= 0) {
         return 'high'
       }
     }
-    for (const keyword of this.priorityPatterns.medium) {
+    for (const keyword of this.mediumPriorityWords) {
       if (text.indexOf(keyword) >= 0) {
         return 'medium'
       }
     }
-    for (const keyword of this.priorityPatterns.low) {
+    for (const keyword of this.lowPriorityWords) {
       if (text.indexOf(keyword) >= 0) {
         return 'low'
       }
@@ -414,23 +433,36 @@ export class NoteService {
     const lower = text.toLowerCase()
 
     // 1. 同义词替换后匹配标签
-    for (const [synonym, standardTag] of Object.entries(this.synonymMap)) {
+    for (let i = 0; i < this.synonymKeys.length; i++) {
+      const synonym = this.synonymKeys[i]
+      const standardTag = this.synonymValues[i]
       if (lower.indexOf(synonym.toLowerCase()) >= 0) {
-        tagScores.set(standardTag, (tagScores.get(standardTag) || 0) + 3)
+        const currentScore = tagScores.get(standardTag) || 0
+        tagScores.set(standardTag, currentScore + 3)
       }
     }
 
-    // 2. 直接匹配标签（遍历所有标签）
-    for (const [category, tags] of Object.entries(this.tagHierarchy)) {
+    // 2. 直接匹配标签（遍历所有标签类别）
+    const allTagGroups: string[][] = [
+      this.tagWork, this.tagStudy, this.tagLife, this.tagDev,
+      this.tagManage, this.tagDoc, this.tagFinance, this.tagHealth
+    ]
+
+    for (let i = 0; i < this.tagCategories.length; i++) {
+      const category = this.tagCategories[i]
+      const tags = allTagGroups[i]
+
       for (const tag of tags) {
         if (lower.indexOf(tag.toLowerCase()) >= 0) {
-          tagScores.set(tag, (tagScores.get(tag) || 0) + 5)
+          const currentScore = tagScores.get(tag) || 0
+          tagScores.set(tag, currentScore + 5)
         }
       }
       // 匹配到类别关键词，给类别下的标签加分
       if (lower.indexOf(category.toLowerCase()) >= 0) {
-        for (const tag of tags.slice(0, 3)) {
-          tagScores.set(tag, (tagScores.get(tag) || 0) + 1)
+        for (let j = 0; j < Math.min(3, tags.length); j++) {
+          const currentScore = tagScores.get(tags[j]) || 0
+          tagScores.set(tags[j], currentScore + 1)
         }
       }
     }
@@ -441,17 +473,26 @@ export class NoteService {
       const keyword = keywords[i]
       if (keyword.length >= 2 && !tagScores.has(keyword)) {
         // 关键词权重递减
-        tagScores.set(keyword, (tagScores.get(keyword) || 0) + (3 - i * 0.3))
+        tagScores.set(keyword, 3 - i * 0.3)
       }
     }
 
     // 4. 按权重排序，取前3个
-    const sortedTags = Array.from(tagScores.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 3)
-      .map(entry => entry[0])
+    const entries: string[][] = []
+    tagScores.forEach((score: number, tag: string) => {
+      entries.push([tag, score.toString()])
+    })
+    entries.sort((a: string[], b: string[]) => {
+      const scoreA = Number(a[1])
+      const scoreB = Number(b[1])
+      return scoreB - scoreA
+    })
 
-    return sortedTags
+    const result: string[] = []
+    for (let i = 0; i < Math.min(3, entries.length); i++) {
+      result.push(entries[i][0])
+    }
+    return result
   }
 
   private extractKeywords(text: string, topK: number = 5): string[] {
@@ -612,7 +653,7 @@ export class NoteService {
           clause.indexOf('推进') >= 0 || clause.indexOf('安排') >= 0 || clause.indexOf('整理') >= 0
         if (!isActionClause && (previous.indexOf('会议') >= 0 || previous.indexOf('评审') >= 0) &&
           clause.indexOf('计划') >= 0) {
-          merged[merged.length - 1] = `${previous}讨论${clause}`
+          merged[merged.length - 1] = previous + '讨论' + clause
           return
         }
       }
@@ -679,22 +720,8 @@ export class NoteService {
   // 识别隐含待办
   private inferImplicitActions(text: string): string[] {
     const actions: string[] = []
-    const patterns: Array<{ regex: RegExp, template: string }> = [
-      { regex: /(.+?)(?:有风险|存在风险|风险较高)/, template: '评估$1风险' },
-      { regex: /(.+?)(?:有问题|存在问题|出问题了)/, template: '排查$1问题' },
-      { regex: /(.+?)(?:还没完成|未完成|还没做|没做完)/, template: '完成$1' },
-      { regex: /(.+?)(?:需要优化|可以优化|待优化)/, template: '优化$1' },
-      { regex: /(.+?)(?:需要测试|待测试|还没测试)/, template: '测试$1' },
-      { regex: /(.+?)(?:需要确认|待确认|还不确定)/, template: '确认$1' },
-      { regex: /(.+?)(?:有bug|有Bug|存在bug|存在Bug)/, template: '修复$1的Bug' },
-      { regex: /(.+?)(?:延期了|推迟了|延后了)/, template: '跟进$1进度' },
-      { regex: /(.+?)(?:超时了|超期了|逾期了)/, template: '处理$1超时问题' },
-      { regex: /(.+?)(?:卡住了|阻塞了|被阻塞)/, template: '解决$1阻塞问题' },
-      { regex: /要(?:尽快|赶紧|马上)(.+?)(?:一下|掉|完|好)/, template: '尽快$1' },
-      { regex: /记得(?:要|去|把)?(.+?)(?:一下|掉|完|好)/, template: '$1' }
-    ]
 
-    for (const pattern of patterns) {
+    for (const pattern of this.implicitPatterns) {
       const match = text.match(pattern.regex)
       if (match && match[1]) {
         let action = pattern.template.replace('$1', match[1].trim())
