@@ -15,6 +15,7 @@
 | [ui-components.md](ui-components.md) | UI 组件库、页面结构、设计规范 |
 | [constants.md](constants.md) | 常量定义、路由配置、主题色值 |
 | [task-division.md](task-division.md) | Native增强与多端适配的五人分工方案 |
+| [test-cases.md](test-cases.md) | 本地AI功能测试用例（8个场景） |
 
 ## 快速导航
 
@@ -24,3 +25,4 @@
 - **想修改 UI？** → [ui-components.md](ui-components.md) + [constants.md](constants.md)
 - **想改数据结构？** → [data-models.md](data-models.md)
 - **想看大作业分工？** → [task-division.md](task-division.md)
+- **想跑测试用例？** → [test-cases.md](test-cases.md)
