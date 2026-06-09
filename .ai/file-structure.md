@@ -12,7 +12,16 @@ todolistAPP/
 └── hvigor/                            # 构建工具缓存
 ```
 
-## 源代码目录 (entry/src/main/ets/)
+## Native 源码目录 (entry/src/main/cpp/)
+
+| 文件 | 功能 | 状态 |
+|------|------|------|
+| `CMakeLists.txt` | 构建 `text_analyzer` 共享库，合并编译文本分析和密码加密 Native 代码 | 已实现 |
+| `text_analyzer.cpp` | Native 文本分析模块，提供关键词提取和句子评分能力 | 已实现 |
+| `crypto_utils.cpp` | Native 密码加密模块，提供 SHA-256 哈希、随机盐值生成、密码验证 | 已实现 |
+| `napi_init.cpp` | NAPI 注册入口，暴露 `extractKeywords`、`scoreSentences`、`hashPassword`、`generateSalt`、`verifyPassword` | 已实现 |
+
+## ArkTS 源代码目录 (entry/src/main/ets/)
 
 ### 入口与生命周期
 
@@ -59,7 +68,7 @@ todolistAPP/
 | 文件 | 功能 | 状态 |
 |------|------|------|
 | `viewmodel/NoteViewModel.ets` | 笔记视图模型，加载笔记列表并转换为卡片视图数据 | 已实现 |
-| `viewmodel/UserViewModel.ets` | 用户视图模型，注册/登录逻辑，使用 PreferenceUtil 存储 | 已实现 |
+| `viewmodel/UserViewModel.ets` | 用户视图模型，注册/登录逻辑；注册时存储 `hash:salt`，登录时调用 NativeCrypto 验证，旧明文账号自动迁移 | 已实现 |
 | `viewmodel/TodoViewModel.ets` | 待办视图模型 | 空文件 |
 | `viewmodel/SearchViewModel.ets` | 搜索视图模型 | 空文件 |
 
@@ -72,6 +81,7 @@ todolistAPP/
 | `utils/PermissionUtil.ets` | 权限申请工具，封装 requestPermissionsFromUser |
 | `utils/PreferenceUtil.ets` | 偏好设置工具 (utils 目录版本) |
 | `utils/HttpUtil.ets` | HTTP 请求工具，支持 GET/POST JSON，Authorization 头，60 秒超时 |
+| `utils/NativeCrypto.ets` | Native 密码加密封装，调用 `libtext_analyzer.so` 中的 `hashPassword`、`generateSalt`、`verifyPassword` |
 
 ### UI 组件 (components/)
 

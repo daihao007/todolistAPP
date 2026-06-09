@@ -15,7 +15,7 @@
 | [ui-components.md](ui-components.md) | UI 组件库、页面结构、设计规范 |
 | [constants.md](constants.md) | 常量定义、路由配置、主题色值 |
 | [task-division.md](task-division.md) | Native增强与多端适配的五人分工方案 |
-| [test-cases.md](test-cases.md) | 本地AI功能测试用例（8个场景） |
+| [test-cases.md](test-cases.md) | 本地AI功能测试用例（8个场景）和 Native 密码加密测试记录 |
 
 ## 快速导航
 
