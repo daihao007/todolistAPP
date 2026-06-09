@@ -189,18 +189,7 @@ export struct NoteEditPage {
   private buildGeneratedTodoInputs(): NoteEditorInput[] {
     const actionLines = this.getGeneratedTodoLines()
     if (actionLines.length === 0) {
-      let input: NoteEditorInput = {
-        title: this.getGeneratedTodoTitle(),
-        content: this.getGeneratedTodoContent(),
-        imagePath: '',
-        tags: this.selectedTags,
-        aiTags: this.aiSelectedTags,
-        todoStatus: TodoVisualStatus.PENDING,
-        summary: this.aiSummary,
-        actionItems: this.aiActionItems,
-        priority: this.aiKeywordsText.length > 0 ? 1 : 0
-      }
-      return [input]
+      return []
     }
 
     return actionLines.map((action: string): NoteEditorInput => {
@@ -249,36 +238,29 @@ export struct NoteEditPage {
     this.aiTagsText = this.aiSelectedTags.join(', ')
   }
 
-  private getGeneratedTodoTitle(): string {
-    const actionLines = this.getGeneratedTodoLines()
-    if (actionLines.length > 0) {
-      return actionLines[0]
-    }
-    const noteTitle = this.titleText.trim()
-    return noteTitle.length > 0 ? `${noteTitle} 待办` : 'AI 生成待办'
-  }
-
-  private getGeneratedTodoContent(): string {
-    const actionText = this.aiActionItems.trim()
-    if (actionText.length > 0) {
-      return actionText
-    }
-    const summaryText = this.aiSummary.trim()
-    if (summaryText.length > 0) {
-      return summaryText
-    }
-    return this.contentText.trim()
-  }
-
   private getGeneratedTodoLines(): string[] {
     return this.aiActionItems
-      .split(/[；;。\n\r]/)
+      .split(/[；;。，,\n\r]/)
       .map((item: string) => item.trim())
       .filter((item: string) => item.length > 0)
   }
 
   private canGenerateTodo(): boolean {
-    return this.getGeneratedTodoContent().length > 0
+    return this.getGeneratedTodoLines().length > 0
+  }
+
+  private getGeneratedTodoCount(): number {
+    return this.getGeneratedTodoLines().length
+  }
+
+  private getGeneratedTodoButtonText(): string {
+    if (this.shouldSaveGeneratedTodo) {
+      return '取消保存待办事项'
+    }
+    if (this.getGeneratedTodoCount() === 0) {
+      return '无可保存待办'
+    }
+    return `保存 ${this.getGeneratedTodoCount()} 条待办事项`
   }
 
   private toggleGeneratedTodo(): void {
@@ -289,7 +271,8 @@ export struct NoteEditPage {
     }
     this.showError = false
     this.shouldSaveGeneratedTodo = !this.shouldSaveGeneratedTodo
-    this.helperText = this.shouldSaveGeneratedTodo ? '当前会在保存笔记时同步创建一条待办事项。' : ''
+    this.helperText = this.shouldSaveGeneratedTodo ?
+      `当前会在保存笔记时同步创建 ${this.getGeneratedTodoCount()} 条待办事项。` : ''
   }
 
   private async applyLocalAi(): Promise<void> {
@@ -305,7 +288,10 @@ export struct NoteEditPage {
       this.aiKeywordsText = aiResult.keywords.join(', ')
       this.aiSummary = aiResult.summary
       this.aiActionItems = aiResult.actionItems.join('；')
-      this.helperText = '本地 AI 推荐已生成，可以继续编辑后保存。'
+      this.shouldSaveGeneratedTodo = this.shouldSaveGeneratedTodo && this.getGeneratedTodoCount() > 0
+      this.helperText = this.getGeneratedTodoCount() > 0 ?
+        '本地 AI 推荐已生成，可以继续编辑后保存。' :
+        '本地 AI 推荐已生成；未识别到明确待办事项。'
     } catch (error) {
       this.showError = true
       this.helperText = '本地 AI 生成失败，请检查内容后重试。'
@@ -327,6 +313,7 @@ export struct NoteEditPage {
       this.aiSummary = cloudResult.summary
       this.aiKeywordsText = cloudResult.keywords.join(', ')
       this.aiActionItems = cloudResult.actionItems.join('；')
+      this.shouldSaveGeneratedTodo = this.shouldSaveGeneratedTodo && this.getGeneratedTodoCount() > 0
       this.applyAiTagSelection(cloudResult.suggestedTags)
       this.helperText = '云端 AI 整理完成，可以编辑后保存。'
       promptAction.showToast({ message: '云端大模型调用成功！' })
@@ -613,7 +600,7 @@ export struct NoteEditPage {
                 this.aiActionItems = value
               })
 
-            Button(this.shouldSaveGeneratedTodo ? '取消保存待办事项' : '保存待办事项')
+            Button(this.getGeneratedTodoButtonText())
               .width('100%')
               .height(44)
               .fontSize(UiConstants.BODY_SIZE)
@@ -834,18 +821,20 @@ export struct NoteEditPage {
             })
 
             if (this.shouldSaveGeneratedTodo) {
-              Text('待办事项预览')
+              Text(`待办事项预览（${this.getGeneratedTodoCount()} 条）`)
                 .fontSize(UiConstants.CAPTION_SIZE)
                 .fontColor(UiPalette.TEXT_SECONDARY)
 
-              NoteCard({
-                title: this.getGeneratedTodoTitle(),
-                content: this.getGeneratedTodoContent(),
-                dateText: this.getPreviewDate(),
-                imagePath: '',
-                tags: this.selectedTags,
-                todoStatus: TodoVisualStatus.PENDING
-              })
+              ForEach(this.buildGeneratedTodoInputs(), (todoInput: NoteEditorInput) => {
+                NoteCard({
+                  title: todoInput.title,
+                  content: todoInput.content,
+                  dateText: this.getPreviewDate(),
+                  imagePath: '',
+                  tags: todoInput.tags,
+                  todoStatus: TodoVisualStatus.PENDING
+                })
+              }, (todoInput: NoteEditorInput) => `${todoInput.title}-${todoInput.content}`)
             }
           }
           .alignItems(HorizontalAlign.Start)
