@@ -166,15 +166,29 @@ export class NoteService {
 
   // 隐含待办模式
   private readonly implicitPatterns: ImplicitActionPattern[] = [
+    // 问题类
     { regex: /(.+?)(?:有风险|存在风险|风险较高)/, template: '评估$1风险' },
     { regex: /(.+?)(?:有问题|存在问题|出问题了)/, template: '排查$1问题' },
+    { regex: /(.+?)(?:卡住了|阻塞了|被阻塞)/, template: '解决$1阻塞问题' },
+    // 设备故障类
+    { regex: /(.+?)(?:漏水了|漏气了|漏电了|坏了|故障了|不能用了)/, template: '修理$1' },
+    { regex: /(.+?)(?:需要维修|需要修理|该修了)/, template: '修理$1' },
+    // 缺少/需要类
+    { regex: /(.+?)(?:快没了|快用完了|不够了|短缺)/, template: '补充$1' },
+    { regex: /(.+?)(?:需要买|需要购买|要买)/, template: '购买$1' },
+    // 到期/过期类
+    { regex: /(.+?)(?:到期了|过期了|快到期了)/, template: '处理$1续期' },
+    // 待完成类
     { regex: /(.+?)(?:还没完成|未完成|还没做|没做完)/, template: '完成$1' },
+    // 优化类
     { regex: /(.+?)(?:需要优化|可以优化|待优化)/, template: '优化$1' },
+    // 测试类
     { regex: /(.+?)(?:需要测试|待测试|还没测试)/, template: '测试$1' },
+    // 确认类
     { regex: /(.+?)(?:需要确认|待确认|还不确定)/, template: '确认$1' },
+    // 进度类
     { regex: /(.+?)(?:延期了|推迟了|延后了)/, template: '跟进$1进度' },
-    { regex: /(.+?)(?:超时了|超期了|逾期了)/, template: '处理$1超时问题' },
-    { regex: /(.+?)(?:卡住了|阻塞了|被阻塞)/, template: '解决$1阻塞问题' }
+    { regex: /(.+?)(?:超时了|超期了|逾期了)/, template: '处理$1超时问题' }
   ]
 
   constructor(context: common.Context) {
@@ -964,14 +978,31 @@ export class NoteService {
       return text
     }
 
-    const actionText = text.substring(keywordIndex)
-      .replace(/^需要/, '')
-      .replace(/^请/, '')
-      .replace(/^记得/, '')
-      .replace(/^务必/, '')
-      .replace(/^还要/, '')
+    // 截取从关键词开始的文本
+    let actionText = text.substring(keywordIndex)
+
+    // 移除行动动词本身（如果它是句子开头）
+    const actionVerbs = ['安排', '完成', '确认', '推进', '整理', '落实', '提交',
+      '联系', '跟进', '准备', '处理', '修改', '更新', '检查', '测试',
+      '部署', '发布', '修复', '优化', '开发', '实现', '设计', '调研',
+      '讨论', '评审', '同步', '对齐', '沟通', '协调', '通知', '提醒']
+    for (const verb of actionVerbs) {
+      if (actionText.startsWith(verb)) {
+        actionText = actionText.substring(verb.length)
+        break
+      }
+    }
+
+    // 移除常见前缀词
+    actionText = actionText
+      .replace(/^(需要|请|记得|务必|还要|得|去|把|将)/, '')
       .trim()
 
-    return actionText.length > 0 ? actionText : text
+    // 如果结果太短或为空，返回原文（去掉开头的无关词）
+    if (actionText.length < 2) {
+      return text.replace(/^(周末|今天|明天|下周|这周|本周)\s*/, '').trim()
+    }
+
+    return actionText
   }
 }
