@@ -12,6 +12,9 @@ std::vector<std::string> ScoreSentencesNative(
     const std::string& text,
     const std::vector<std::string>& keywords,
     int topK);
+std::string HashPasswordNative(const std::string& password, const std::string& salt);
+std::string GenerateSaltNative();
+bool VerifyPasswordNative(const std::string& password, const std::string& salt, const std::string& expectedHash);
 
 namespace {
 
@@ -35,6 +38,20 @@ napi_value CreateEmptyArray(napi_env env)
     napi_value array;
     napi_create_array_with_length(env, 0, &array);
     return array;
+}
+
+napi_value CreateString(napi_env env, const std::string& value)
+{
+    napi_value result;
+    napi_create_string_utf8(env, value.c_str(), value.size(), &result);
+    return result;
+}
+
+napi_value CreateBoolean(napi_env env, bool value)
+{
+    napi_value result;
+    napi_get_boolean(env, value, &result);
+    return result;
 }
 
 std::string ReadStringArgument(napi_env env, napi_value value)
@@ -133,12 +150,66 @@ napi_value ScoreSentences(napi_env env, napi_callback_info info)
     }
 }
 
+napi_value HashPassword(napi_env env, napi_callback_info info)
+{
+    size_t argc = 2;
+    napi_value args[2] = { nullptr, nullptr };
+    napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+
+    if (argc < 2 || args[0] == nullptr || args[1] == nullptr) {
+        return CreateString(env, "");
+    }
+
+    try {
+        const std::string password = ReadStringArgument(env, args[0]);
+        const std::string salt = ReadStringArgument(env, args[1]);
+        return CreateString(env, HashPasswordNative(password, salt));
+    } catch (...) {
+        OH_LOG_Print(LOG_APP, LOG_ERROR, TEXT_ANALYZER_LOG_DOMAIN, TEXT_ANALYZER_LOG_TAG, "HashPassword failed");
+        return CreateString(env, "");
+    }
+}
+
+napi_value GenerateSalt(napi_env env, napi_callback_info info)
+{
+    try {
+        return CreateString(env, GenerateSaltNative());
+    } catch (...) {
+        OH_LOG_Print(LOG_APP, LOG_ERROR, TEXT_ANALYZER_LOG_DOMAIN, TEXT_ANALYZER_LOG_TAG, "GenerateSalt failed");
+        return CreateString(env, "");
+    }
+}
+
+napi_value VerifyPassword(napi_env env, napi_callback_info info)
+{
+    size_t argc = 3;
+    napi_value args[3] = { nullptr, nullptr, nullptr };
+    napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+
+    if (argc < 3 || args[0] == nullptr || args[1] == nullptr || args[2] == nullptr) {
+        return CreateBoolean(env, false);
+    }
+
+    try {
+        const std::string password = ReadStringArgument(env, args[0]);
+        const std::string salt = ReadStringArgument(env, args[1]);
+        const std::string expectedHash = ReadStringArgument(env, args[2]);
+        return CreateBoolean(env, VerifyPasswordNative(password, salt, expectedHash));
+    } catch (...) {
+        OH_LOG_Print(LOG_APP, LOG_ERROR, TEXT_ANALYZER_LOG_DOMAIN, TEXT_ANALYZER_LOG_TAG, "VerifyPassword failed");
+        return CreateBoolean(env, false);
+    }
+}
+
 EXTERN_C_START
 static napi_value Init(napi_env env, napi_value exports)
 {
     napi_property_descriptor desc[] = {
         { "extractKeywords", nullptr, ExtractKeywords, nullptr, nullptr, nullptr, napi_default, nullptr },
-        { "scoreSentences", nullptr, ScoreSentences, nullptr, nullptr, nullptr, napi_default, nullptr }
+        { "scoreSentences", nullptr, ScoreSentences, nullptr, nullptr, nullptr, napi_default, nullptr },
+        { "hashPassword", nullptr, HashPassword, nullptr, nullptr, nullptr, napi_default, nullptr },
+        { "generateSalt", nullptr, GenerateSalt, nullptr, nullptr, nullptr, napi_default, nullptr },
+        { "verifyPassword", nullptr, VerifyPassword, nullptr, nullptr, nullptr, napi_default, nullptr }
     };
     napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]), desc);
     return exports;

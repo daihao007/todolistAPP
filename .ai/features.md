@@ -6,8 +6,8 @@
 
 | 功能 | 实现位置 | 说明 |
 |------|----------|------|
-| 账号注册 | `UserViewModel.register()` | 账号 + 昵称 + 密码，存储在 Preferences |
-| 账号登录 | `UserViewModel.login()` | 验证账号密码 |
+| 账号注册 | `UserViewModel.register()` | 账号 + 昵称 + 密码；密码以 SHA-256 `hash:salt` 形式存储在 Preferences |
+| 账号登录 | `UserViewModel.login()` | 验证加盐哈希密码，兼容旧版明文账号并在首次正确登录后自动迁移 |
 | 昵称显示 | `Index.ets` | 首页显示当前用户昵称 |
 | 昵称编辑 | `Index.ets` | 点击昵称可在线编辑 |
 | 登出 | `Index.ets` | 清除当前用户状态 |
@@ -93,6 +93,7 @@
 |------|----------|------|
 | RDB 存储 | `RdbStoreManager.ets` | notes 和 todos 两张表 |
 | 偏好存储 | `PreferenceUtil.ets` | 用户信息存储 |
+| 密码安全存储 | `NativeCrypto.ets`, `UserViewModel.ets`, `crypto_utils.cpp` | C++ SHA-256 + 16 字节随机盐；Preferences 仅保存 `64位hash:32位salt` |
 | 增量迁移 | `RdbStoreManager.ets` | ALTER TABLE 添加新列 |
 | 备份恢复 | `EntryBackupAbility.ets` | 应用数据备份能力 |
 
@@ -127,6 +128,6 @@
 ### 低优先级
 
 7. **云同步** - 接入云端存储实现跨设备同步
-8. **用户系统增强** - 密码加密、账号找回
+8. **用户系统增强** - 账号找回、密码重置
 9. **笔记分享** - 分享到其他应用
 10. **批量操作** - 批量删除、批量标签

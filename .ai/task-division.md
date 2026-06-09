@@ -92,6 +92,8 @@ const sentences: string[] = textAnalyzer.scoreSentences(text, keywords, 2)
 
 **交付物**: SHA-256 密码哈希模块，用户密码安全存储
 
+**状态**: 已完成（2026-06-09）
+
 ### 具体任务
 
 1. 编写 `crypto_utils.cpp`：SHA-256 哈希 + 随机盐值生成 + 密码验证
@@ -170,6 +172,16 @@ if (!stored.includes(':')) {
 2. 使用正确密码登录，验证成功
 3. 使用错误密码登录，验证失败
 4. 旧版明文用户首次登录后自动迁移为哈希格式
+
+### 完成记录（2026-06-09）
+
+- 已实现 `entry/src/main/cpp/crypto_utils.cpp`，提供 SHA-256、16 字节随机盐值生成、密码验证。
+- 已在 `entry/src/main/cpp/napi_init.cpp` 注册 `hashPassword()`、`generateSalt()`、`verifyPassword()`，并在 `entry/src/main/cpp/CMakeLists.txt` 合并构建。
+- 已新增 `entry/src/main/ets/utils/NativeCrypto.ets`，封装 Native 加密能力。
+- 已改造 `entry/src/main/ets/viewmodel/UserViewModel.ets`：注册写入 `64位hash:32位salt`，登录验证哈希，旧版明文密码在正确登录后自动迁移。
+- DevEco/Hvigor 构建通过：`assembleHap` 成功，Native CMake/Ninja 构建成功。
+- 模拟器功能验证通过：注册测试账号 `crypto0609a`，正确密码 `Pw123456` 登录成功进入 `pages/Index`，错误密码 `Wrong123` 停留在 `pages/LoginPage`。
+- 非明文存储验证通过：临时内部探针读取 Preferences 记录，结果为 `recordLength=97 hashRecord=true containsPlain=false`；探针代码已删除，最终版重新构建并安装验证通过。
 
 ### 预计工作量: 2天
 
