@@ -100,18 +100,42 @@ export class NoteService {
 
   // 同义词映射表（使用两个数组模拟 Map）
   private readonly synonymKeys: string[] = [
-    '开会', '开个会', '站会', '上课', '听课', '培训', '买东西', '采购', '下单',
-    '修bug', '修Bug', '发布', '部署', '联调', '对接', '写代码', '编码', '撸代码',
-    '写文档', '写需求', '排期', '做计划', '复盘', '回顾', '汇报', '写周报',
-    '健身', '锻炼', '跑步', '做饭', '点外卖', 'debug', '调试',
-    'review', '代码评审', 'CR', '需求评审', '同步', '对齐', '拉通', '跟进', '追踪', '推动'
+    '开会', '开个会', '站会', '周会', '例会', '晨会', '早会', '夕会', '周例会', '月会',
+    '上课', '听课', '培训', '学习会',
+    '买东西', '采购', '下单', '购物',
+    '修bug', '修Bug', '修复bug', '修复Bug', '解bug',
+    '发布', '上线发布', '发版',
+    '联调', '对接', '联调测试',
+    '写代码', '编码', '撸代码', '敲代码', '打代码',
+    '写文档', '写需求', '写PRD', '写方案',
+    '排期', '做计划', '定计划', '定排期',
+    '复盘', '回顾', '总结会',
+    '汇报', '写周报', '周报总结',
+    '健身', '锻炼', '跑步', '运动',
+    '做饭', '点外卖', '吃饭',
+    'debug', '调试', '排查',
+    'review', '代码评审', 'CR', '需求评审', '方案评审',
+    '同步', '对齐', '拉通', '拉齐', '碰一下',
+    '跟进', '追踪', '推动', '推进'
   ]
   private readonly synonymValues: string[] = [
-    '会议', '会议', '会议', '课程', '课程', '课程', '购物', '购物', '购物',
-    'Bug', 'Bug', '上线', '上线', '接口', '接口', '开发', '开发', '开发',
-    '文档', '文档', '计划', '计划', '总结', '总结', '周报', '周报',
-    '运动', '运动', '运动', '饮食', '饮食', 'Bug', 'Bug',
-    '评审', '评审', '评审', '评审', '沟通', '沟通', '沟通', '任务', '任务', '任务'
+    '会议', '会议', '会议', '会议', '会议', '会议', '会议', '会议', '会议', '会议',
+    '课程', '课程', '课程', '课程',
+    '购物', '购物', '购物', '购物',
+    'Bug', 'Bug', 'Bug', 'Bug', 'Bug',
+    '上线', '上线', '上线',
+    '接口', '接口', '接口',
+    '开发', '开发', '开发', '开发', '开发',
+    '文档', '文档', '文档', '文档',
+    '计划', '计划', '计划', '计划',
+    '总结', '总结', '总结',
+    '周报', '周报', '周报',
+    '运动', '运动', '运动', '运动',
+    '饮食', '饮食', '饮食',
+    'Bug', 'Bug', 'Bug',
+    '评审', '评审', '评审', '评审', '评审',
+    '沟通', '沟通', '沟通', '沟通', '沟通',
+    '任务', '任务', '任务', '任务'
   ]
 
   // 时间提取模式
@@ -234,15 +258,29 @@ export class NoteService {
   }
 
   async generateLocalAiSuggestion(title: string, content: string): Promise<AiSuggestion> {
-    const trimmed = `${title.trim()} ${content.trim()}`.trim()
-    const suggestedTags = this.extractTagsFromText(trimmed)
-    const keywords = this.extractKeywords(trimmed)
-    const todoStatus = this.inferTodoStatus(trimmed)
-    const priority = this.inferPriority(trimmed)
-    const summary = this.buildLocalSummary(trimmed)
-    const actionItems = this.extractActionItems(trimmed)
-    const timeInfo = this.extractTimeInfo(trimmed)
-    const priorityLevel = this.extractPriorityLevel(trimmed)
+    // 标签和关键词基于标题+内容
+    const fullText = `${title.trim()} ${content.trim()}`.trim()
+    const suggestedTags = this.extractTagsFromText(fullText)
+    const keywords = this.extractKeywords(fullText)
+    const todoStatus = this.inferTodoStatus(fullText)
+    const priority = this.inferPriority(fullText)
+    const timeInfo = this.extractTimeInfo(fullText)
+    const priorityLevel = this.extractPriorityLevel(fullText)
+
+    // 摘要只基于内容，避免标题重复
+    const contentText = content.trim()
+    let summary = ''
+    if (contentText.length > 0) {
+      summary = this.buildLocalSummary(contentText)
+    }
+    // 如果内容太短，才用标题+内容生成摘要
+    if (summary.length === 0 && fullText.length > 0) {
+      summary = this.buildLocalSummary(fullText)
+    }
+
+    // 待办基于标题+内容
+    const actionItems = this.extractActionItems(fullText)
+
     return {
       suggestedTags,
       keywords,
