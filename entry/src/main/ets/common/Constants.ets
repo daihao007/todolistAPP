@@ -47,6 +47,36 @@ export class UiConstants {
   static readonly CARD_SHADOW_RADIUS: number = 24
 }
 
+export enum Breakpoint {
+  SM = 'sm',
+  MD = 'md',
+  LG = 'lg'
+}
+
+export class ResponsiveConstants {
+  static readonly BREAKPOINT_MD: number = 600
+  static readonly BREAKPOINT_LG: number = 840
+
+  static readonly SM_PAGE_PADDING: number = 20
+  static readonly MD_PAGE_PADDING: number = 24
+  static readonly LG_PAGE_PADDING: number = 32
+
+  static readonly SM_COLUMNS: number = 1
+  static readonly MD_COLUMNS: number = 2
+  static readonly LG_COLUMNS: number = 3
+
+  static readonly SM_IMAGE_HEIGHT: number = 160
+  static readonly MD_IMAGE_HEIGHT: number = 180
+  static readonly LG_IMAGE_HEIGHT: number = 200
+
+  static readonly SM_CONTENT_LINES: number = 3
+  static readonly MD_CONTENT_LINES: number = 4
+  static readonly LG_CONTENT_LINES: number = 5
+
+  static readonly FORM_MAX_WIDTH: number = 760
+  static readonly SEARCH_MAX_WIDTH: number = 960
+}
+
 export class UiPalette {
   static readonly PAGE_BACKGROUND: string = '#FDFBFA' // 奶泡白
   static readonly SURFACE: string = '#FFFFFF'

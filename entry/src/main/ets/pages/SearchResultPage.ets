@@ -1,8 +1,9 @@
 import { NoteCard } from '../components/NoteCard'
 import { TagChip } from '../components/TagChip'
-import { CommonConstants, TodoVisualStatus, UiConstants, UiPalette } from '../common/Constants'
+import { Breakpoint, CommonConstants, ResponsiveConstants, TodoVisualStatus, UiConstants, UiPalette } from '../common/Constants'
 import { RdbStoreManager } from '../database/RdbStoreManager'
 import { Note } from '../model/Note'
+import { BreakpointUtil } from '../utils/BreakpointUtil'
 import { DateUtil } from '../utils/DateUtil'
 import common from '@ohos.app.ability.common'
 
@@ -21,6 +22,7 @@ class DateRangeFilter {
 @Entry
 @Component
 export struct SearchResultPage {
+  @StorageProp('currentBreakpoint') currentBreakpoint: Breakpoint = Breakpoint.SM
   // 搜索条件状态
   @State keyword: string = ''
   @State startDate: string = ''
@@ -212,6 +214,22 @@ export struct SearchResultPage {
     void this.handleSearch()
   }
 
+  private getPagePadding(): number {
+    return BreakpointUtil.getPagePadding(this.currentBreakpoint)
+  }
+
+  private getContentMaxWidth(): number {
+    return BreakpointUtil.isWide(this.currentBreakpoint) ? ResponsiveConstants.SEARCH_MAX_WIDTH : 9999
+  }
+
+  private getGridSpan(): number {
+    return BreakpointUtil.getGridSpan(this.currentBreakpoint)
+  }
+
+  private getGridColumns(): number {
+    return BreakpointUtil.getColumns(this.currentBreakpoint) * 4
+  }
+
   /**
    * C 同学追加逻辑：更新笔记勾选状态并同步数据库
    * @param noteId 笔记ID
@@ -390,35 +408,42 @@ export struct SearchResultPage {
           }
           .padding(40).width('100%').backgroundColor(UiPalette.SURFACE).borderRadius(UiConstants.CARD_RADIUS).alignItems(HorizontalAlign.Center)
         } else {
-          Column({ space: 12 }) {
+          GridRow({ columns: this.getGridColumns(), gutter: { x: 12, y: 12 } }) {
             ForEach(this.filteredNotes, (note: Note) => {
-              NoteCard({
-                title: note.title,
-                content: note.content,
-                dateText: DateUtil.formatDate(note.createTime),
-                tags: note.tags ? note.tags.split(',') : [],
-                todoStatus: note.todoStatus,
-                imagePath: note.imagePath,
-                // 这里是核心：将勾选动作回调给 handleToggleStatus
-                onCheckboxChange: (isDone: boolean) => {
-                  void this.handleToggleStatus(note.id, isDone)
-                },
-                onTodoStatusChange: (status: TodoVisualStatus) => {
-                  void this.handleStatusChange(note.id, status)
-                }
-              })
+              GridCol({ span: this.getGridSpan() }) {
+                NoteCard({
+                  title: note.title,
+                  content: note.content,
+                  dateText: DateUtil.formatDate(note.createTime),
+                  tags: note.tags ? note.tags.split(',') : [],
+                  todoStatus: note.todoStatus,
+                  imagePath: note.imagePath,
+                  // 这里是核心：将勾选动作回调给 handleToggleStatus
+                  onCheckboxChange: (isDone: boolean) => {
+                    void this.handleToggleStatus(note.id, isDone)
+                  },
+                  onTodoStatusChange: (status: TodoVisualStatus) => {
+                    void this.handleStatusChange(note.id, status)
+                  }
+                })
+              }
             }, (note: Note) => note.id + "_" + note.todoStatus)
           }
           .width('100%')
         }
       }
-      .padding(UiConstants.PAGE_PADDING)
+      .padding(this.getPagePadding())
       .width('100%')
+      .constraintSize({ maxWidth: this.getContentMaxWidth() })
+      .alignSelf(ItemAlign.Center)
       .alignItems(HorizontalAlign.Start)
     }
     .width('100%')
     .height('100%')
     .scrollBar(BarState.Off)
     .backgroundColor(UiPalette.PAGE_BACKGROUND)
+    .onAreaChange((oldArea: Area, newArea: Area) => {
+      BreakpointUtil.updateByWidth(newArea.width.toString())
+    })
   }
 }

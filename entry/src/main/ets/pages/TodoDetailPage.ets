@@ -1,12 +1,13 @@
 import router from '@ohos.router'
 import promptAction from '@ohos.promptAction'
 import common from '@ohos.app.ability.common'
-import { CommonConstants, TodoVisualStatus, UiConstants, UiPalette } from '../common/Constants'
+import { Breakpoint, CommonConstants, ResponsiveConstants, TodoVisualStatus, UiConstants, UiPalette } from '../common/Constants'
 import { NoteCard } from '../components/NoteCard'
 import { TagChip } from '../components/TagChip'
 import { TodoStatusSwitch } from '../components/TodoStatusSwitch'
 import { ImageService } from '../service/ImageService'
 import { NoteEditorInput, NoteService } from '../service/NoteService'
+import { BreakpointUtil } from '../utils/BreakpointUtil'
 import { DateUtil } from '../utils/DateUtil'
 import { Logger } from '../utils/Logger'
 
@@ -23,6 +24,7 @@ class TagOption {
 @Entry
 @Component
 export struct TodoDetailPage {
+  @StorageProp('currentBreakpoint') currentBreakpoint: Breakpoint = Breakpoint.SM
   @State titleText: string = ''
   @State contentText: string = ''
   @State imagePath: string = ''
@@ -331,6 +333,18 @@ export struct TodoDetailPage {
     return DateUtil.formatDate(this.createTime)
   }
 
+  private getPagePadding(): number {
+    return BreakpointUtil.getPagePadding(this.currentBreakpoint)
+  }
+
+  private getContentMaxWidth(): number {
+    return BreakpointUtil.isWide(this.currentBreakpoint) ? ResponsiveConstants.FORM_MAX_WIDTH : 9999
+  }
+
+  private getImageHeight(): number {
+    return BreakpointUtil.getImageHeight(this.currentBreakpoint)
+  }
+
   build() {
     Scroll() {
       Column({ space: UiConstants.SECTION_SPACING }) {
@@ -539,7 +553,7 @@ export struct TodoDetailPage {
               Column({ space: 8 }) {
                 Image(this.imagePath)
                   .width('100%')
-                  .height(180)
+                  .height(this.getImageHeight())
                   .borderRadius(16)
                   .objectFit(ImageFit.Cover)
 
@@ -657,13 +671,18 @@ export struct TodoDetailPage {
           .width('100%')
         }
       }
-      .padding(UiConstants.PAGE_PADDING)
+      .padding(this.getPagePadding())
       .width('100%')
+      .constraintSize({ maxWidth: this.getContentMaxWidth() })
+      .alignSelf(ItemAlign.Center)
       .alignItems(HorizontalAlign.Start)
     }
     .width('100%')
     .height('100%')
     .scrollBar(BarState.Off)
     .backgroundColor(UiPalette.PAGE_BACKGROUND)
+    .onAreaChange((oldArea: Area, newArea: Area) => {
+      BreakpointUtil.updateByWidth(newArea.width.toString())
+    })
   }
 }
