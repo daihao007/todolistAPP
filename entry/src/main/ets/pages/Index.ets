@@ -1,6 +1,7 @@
 import router from '@ohos.router'
 import common from '@ohos.app.ability.common'
 import {
+  Breakpoint,
   CommonConstants,
   TodoVisualStatus,
   UiConstants,
@@ -10,6 +11,7 @@ import { RdbStoreManager } from '../database/RdbStoreManager'
 import { NoteViewModel, NoteCardViewData } from '../viewmodel/NoteViewModel'
 import { NoteCard } from '../components/NoteCard'
 import { TagChip } from '../components/TagChip'
+import { BreakpointUtil } from '../utils/BreakpointUtil'
 import { PreferenceUtil } from '../utils/PreferenceUtil'
 import promptAction from '@ohos.promptAction'
 
@@ -54,6 +56,7 @@ struct DatePickerButton {
 @Entry
 @Component
 struct Index {
+  @StorageProp('currentBreakpoint') currentBreakpoint: Breakpoint = Breakpoint.SM
   @State noteList: NoteCardViewData[] = []
   @State loading: boolean = true
   @State username: string = '开发者'
@@ -163,6 +166,18 @@ struct Index {
     } finally {
       this.loading = false
     }
+  }
+
+  private getPagePadding(): number {
+    return BreakpointUtil.getPagePadding(this.currentBreakpoint)
+  }
+
+  private getGridSpan(): number {
+    return BreakpointUtil.getGridSpan(this.currentBreakpoint)
+  }
+
+  private getGridColumns(): number {
+    return BreakpointUtil.getColumns(this.currentBreakpoint) * 4
   }
 
   private async handleToggleStatus(noteId: string, isDone: boolean): Promise<void> {
@@ -358,7 +373,7 @@ struct Index {
             }
             .width('100%')
             .alignItems(VerticalAlign.Center)
-            .padding({ left: UiConstants.PAGE_PADDING, right: UiConstants.PAGE_PADDING, top: 40, bottom: 20 })
+            .padding({ left: this.getPagePadding(), right: this.getPagePadding(), top: 40, bottom: 20 })
 
             Column({ space: 12 }) {
               Stack({ alignContent: Alignment.End }) {
@@ -419,14 +434,15 @@ struct Index {
               this.TagFilterBar()
             }
             .padding({ left: 16, right: 16, top: 16, bottom: 16 })
-            .margin({ left: UiConstants.PAGE_PADDING, right: UiConstants.PAGE_PADDING, bottom: 12 })
+            .margin({ left: this.getPagePadding(), right: this.getPagePadding(), bottom: 12 })
             .backgroundColor(UiPalette.SURFACE)
             .borderRadius(20)
             .shadow({ radius: 12, color: '#12CABFBF', offsetY: 6 })
 
-            List({ space: 12 }) {
-              ForEach(this.filterItems(false), (note: NoteCardViewData) => {
-                ListItem() {
+            Scroll() {
+              GridRow({ columns: this.getGridColumns(), gutter: { x: 12, y: 12 } }) {
+                ForEach(this.filterItems(false), (note: NoteCardViewData) => {
+                  GridCol({ span: this.getGridSpan() }) {
                   NoteCard({
                     title: note.title,
                     content: note.content,
@@ -435,15 +451,17 @@ struct Index {
                     todoStatus: note.todoStatus,
                     imagePath: note.imagePath
                   })
-                }
-                .onClick(() => {
-                  router.pushUrl({ url: 'pages/NoteEditPage', params: { noteId: note.id } })
-                })
-              }, (note: NoteCardViewData) => note.id)
+                  }
+                  .onClick(() => {
+                    router.pushUrl({ url: 'pages/NoteEditPage', params: { noteId: note.id } })
+                  })
+                }, (note: NoteCardViewData) => note.id)
+              }
             }
             .width('100%')
             .layoutWeight(1)
-            .padding({ left: UiConstants.PAGE_PADDING, right: UiConstants.PAGE_PADDING, bottom: 80 })
+            .padding({ left: this.getPagePadding(), right: this.getPagePadding(), bottom: 80 })
+            .scrollBar(BarState.Off)
           }
           .width('100%').height('100%')
           .backgroundColor(UiPalette.PAGE_BACKGROUND)
@@ -470,7 +488,7 @@ struct Index {
               Text('待办清单').fontSize(28).fontWeight(FontWeight.Bold).fontColor(UiPalette.TEXT_PRIMARY)
               Text('规划日程，享受划掉任务的快乐').fontSize(16).fontColor(UiPalette.TEXT_SECONDARY).margin({ top: 8 })
             }
-            .width('100%').alignItems(HorizontalAlign.Start).padding({ left: UiConstants.PAGE_PADDING, top: 40, bottom: 20 })
+            .width('100%').alignItems(HorizontalAlign.Start).padding({ left: this.getPagePadding(), right: this.getPagePadding(), top: 40, bottom: 20 })
 
             Column({ space: 12 }) {
               Stack({ alignContent: Alignment.End }) {
@@ -531,14 +549,15 @@ struct Index {
               this.TagFilterBar()
             }
             .padding({ left: 16, right: 16, top: 16, bottom: 16 })
-            .margin({ left: UiConstants.PAGE_PADDING, right: UiConstants.PAGE_PADDING, bottom: 12 })
+            .margin({ left: this.getPagePadding(), right: this.getPagePadding(), bottom: 12 })
             .backgroundColor(UiPalette.SURFACE)
             .borderRadius(20)
             .shadow({ radius: 12, color: '#12CABFBF', offsetY: 6 })
 
-            List({ space: 12 }) {
-              ForEach(this.filterItems(true), (note: NoteCardViewData) => {
-                ListItem() {
+            Scroll() {
+              GridRow({ columns: this.getGridColumns(), gutter: { x: 12, y: 12 } }) {
+                ForEach(this.filterItems(true), (note: NoteCardViewData) => {
+                  GridCol({ span: this.getGridSpan() }) {
                   NoteCard({
                     title: note.title,
                     content: note.content,
@@ -553,15 +572,17 @@ struct Index {
                       void this.handleStatusChange(note.id, status)
                     }
                   })
-                }
-                .onClick(() => {
-                  router.pushUrl({ url: 'pages/TodoDetailPage', params: { noteId: note.id } })
-                })
-              }, (note: NoteCardViewData) => note.id + '_' + note.todoStatus)
+                  }
+                  .onClick(() => {
+                    router.pushUrl({ url: 'pages/TodoDetailPage', params: { noteId: note.id } })
+                  })
+                }, (note: NoteCardViewData) => note.id + '_' + note.todoStatus)
+              }
             }
             .width('100%')
             .layoutWeight(1)
-            .padding({ left: UiConstants.PAGE_PADDING, right: UiConstants.PAGE_PADDING, bottom: 80 })
+            .padding({ left: this.getPagePadding(), right: this.getPagePadding(), bottom: 80 })
+            .scrollBar(BarState.Off)
           }
           .width('100%').height('100%')
           .backgroundColor(UiPalette.PAGE_BACKGROUND)
@@ -587,5 +608,8 @@ struct Index {
     .width('100%')
     .height('100%')
     .backgroundColor(UiPalette.PAGE_BACKGROUND)
+    .onAreaChange((oldArea: Area, newArea: Area) => {
+      BreakpointUtil.updateByWidth(newArea.width.toString())
+    })
   }
 }
