@@ -1,8 +1,10 @@
-import { TodoVisualStatus, UiConstants, UiPalette } from '../common/Constants'
+import { Breakpoint, TodoVisualStatus, UiConstants, UiPalette } from '../common/Constants'
 import { TagChip } from './TagChip'
+import { BreakpointUtil } from '../utils/BreakpointUtil'
 
 @Component
 export struct NoteCard {
+  @StorageProp('currentBreakpoint') currentBreakpoint: Breakpoint = Breakpoint.SM
   @Prop title: string = ''
   @Prop content: string = ''
   @Prop dateText: string = ''
@@ -57,6 +59,14 @@ export struct NoteCard {
     }
   }
 
+  private getImageHeight(): number {
+    return BreakpointUtil.getImageHeight(this.currentBreakpoint)
+  }
+
+  private getContentLines(): number {
+    return BreakpointUtil.getContentLines(this.currentBreakpoint)
+  }
+
   build() {
     Column({ space: UiConstants.CONTENT_SPACING }) {
       Row() {
@@ -90,7 +100,7 @@ export struct NoteCard {
             .fontSize(UiConstants.BODY_SIZE)
             .fontColor(UiPalette.TEXT_SECONDARY)
             .lineHeight(22)
-            .maxLines(3)
+            .maxLines(this.getContentLines())
             .textOverflow({ overflow: TextOverflow.Ellipsis })
         }
         .layoutWeight(1)
@@ -133,7 +143,7 @@ export struct NoteCard {
         Column({ space: 8 }) {
           Image(this.imagePath)
             .width('100%')
-            .height(160)
+            .height(this.getImageHeight())
             .borderRadius(16)
             .objectFit(ImageFit.Cover)
 
