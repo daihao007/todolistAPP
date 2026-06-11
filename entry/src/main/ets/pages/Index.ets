@@ -359,7 +359,7 @@ struct Index {
                 if (this.editingNickname) {
                   Row({ space: 8 }) {
                     Text('你好，')
-                      .fontSize(28)
+                      .fontSize(UiConstants.TITLE_SIZE)
                       .fontWeight(FontWeight.Bold)
                       .fontColor(UiPalette.TEXT_PRIMARY)
 
@@ -376,7 +376,7 @@ struct Index {
                   }
                 } else {
                   Text(`你好，${this.username}`)
-                    .fontSize(28)
+                    .fontSize(UiConstants.TITLE_SIZE)
                     .fontWeight(FontWeight.Bold)
                     .fontColor(UiPalette.TEXT_PRIMARY)
                 }
@@ -547,7 +547,7 @@ struct Index {
         Stack({ alignContent: Alignment.BottomEnd }) {
           Column() {
             Column() {
-              Text('待办清单').fontSize(28).fontWeight(FontWeight.Bold).fontColor(UiPalette.TEXT_PRIMARY)
+              Text('待办清单').fontSize(UiConstants.TITLE_SIZE).fontWeight(FontWeight.Bold).fontColor(UiPalette.TEXT_PRIMARY)
               Text('规划日程，享受划掉任务的快乐').fontSize(16).fontColor(UiPalette.TEXT_SECONDARY).margin({ top: 8 })
             }
             .width('100%').alignItems(HorizontalAlign.Start).padding({ left: this.getPagePadding(), right: this.getPagePadding(), top: 40, bottom: 20 })
@@ -712,7 +712,7 @@ struct Index {
         text: this.currentIndex === 0 ? this.noteKeyword : this.todoKeyword
       })
         .width('100%')
-        .height(44)
+        .height(UiConstants.COMPACT_CONTROL_HEIGHT)
         .backgroundColor(UiPalette.SURFACE)
         .borderRadius(999)
         .padding({ left: 16, right: 16 })
@@ -787,7 +787,7 @@ struct Index {
     }
     .width('100%')
     .height('100%')
-    .padding(16)
+    .padding(UiConstants.CARD_PADDING)
     .backgroundColor(UiPalette.PAGE_BACKGROUND)
     .alignItems(HorizontalAlign.Start)
   }

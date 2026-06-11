@@ -509,7 +509,7 @@ export struct NoteEditPage {
     Column({ space: UiConstants.SECTION_SPACING }) {
         Column({ space: 6 }) {
           Text(this.pageTitle)
-            .fontSize(28)
+            .fontSize(UiConstants.TITLE_SIZE)
             .fontWeight(FontWeight.Bold)
             .fontColor(UiPalette.TEXT_PRIMARY)
 
@@ -534,10 +534,10 @@ export struct NoteEditPage {
 
             TextInput({ placeholder: '输入笔记标题', text: this.titleText })
               .width('100%')
-              .height(52)
+              .height(UiConstants.CONTROL_HEIGHT)
               .fontSize(UiConstants.BODY_SIZE)
               .backgroundColor(UiPalette.SURFACE_MUTED)
-              .borderRadius(14)
+              .borderRadius(UiConstants.FIELD_RADIUS)
               .padding({ left: 14, right: 14 })
               .onChange((value: string) => {
                 this.titleText = value
@@ -558,7 +558,7 @@ export struct NoteEditPage {
           }
           .alignItems(HorizontalAlign.Start)
           .width('100%')
-          .padding(16)
+          .padding(UiConstants.CARD_PADDING)
           .backgroundColor(UiPalette.SURFACE)
           .borderRadius(UiConstants.CARD_RADIUS)
 
@@ -573,8 +573,8 @@ export struct NoteEditPage {
               .height(180)
               .fontSize(UiConstants.BODY_SIZE)
               .backgroundColor(UiPalette.SURFACE_MUTED)
-              .borderRadius(14)
-              .padding(14)
+              .borderRadius(UiConstants.FIELD_RADIUS)
+              .padding(UiConstants.FIELD_RADIUS)
               .onChange((value: string) => {
                 this.contentText = value
                 this.notifyDraftChange()
@@ -582,7 +582,7 @@ export struct NoteEditPage {
           }
           .alignItems(HorizontalAlign.Start)
           .width('100%')
-          .padding(16)
+          .padding(UiConstants.CARD_PADDING)
           .backgroundColor(UiPalette.SURFACE)
           .borderRadius(UiConstants.CARD_RADIUS)
 
@@ -595,7 +595,7 @@ export struct NoteEditPage {
             Row({ space: 12 }) {
               Button(this.aiLoading ? 'AI 处理中...' : '本地 AI 自动提取')
                 .layoutWeight(1)
-                .height(44)
+                .height(UiConstants.COMPACT_CONTROL_HEIGHT)
                 .fontSize(UiConstants.BODY_SIZE)
                 .fontColor(Color.White)
                 .backgroundColor(UiPalette.PRIMARY)
@@ -608,7 +608,7 @@ export struct NoteEditPage {
 
               Button('云端 AI 整理')
                 .layoutWeight(1)
-                .height(44)
+                .height(UiConstants.COMPACT_CONTROL_HEIGHT)
                 .fontSize(UiConstants.BODY_SIZE)
                 .fontColor(UiPalette.TEXT_PRIMARY)
                 .backgroundColor(UiPalette.SURFACE_MUTED)
@@ -633,10 +633,10 @@ export struct NoteEditPage {
 
             TextInput({ placeholder: '例如：工作, 会议, 紧急', text: this.aiTagsText })
               .width('100%')
-              .height(44)
+              .height(UiConstants.COMPACT_CONTROL_HEIGHT)
               .fontSize(UiConstants.BODY_SIZE)
               .backgroundColor(UiPalette.SURFACE_MUTED)
-              .borderRadius(14)
+              .borderRadius(UiConstants.FIELD_RADIUS)
               .padding({ left: 14, right: 14 })
               .onChange((value: string) => {
                 this.aiTagsText = value
@@ -652,8 +652,8 @@ export struct NoteEditPage {
               .height(120)
               .fontSize(UiConstants.BODY_SIZE)
               .backgroundColor(UiPalette.SURFACE_MUTED)
-              .borderRadius(14)
-              .padding(14)
+              .borderRadius(UiConstants.FIELD_RADIUS)
+              .padding(UiConstants.FIELD_RADIUS)
               .onChange((value: string) => {
                 this.aiSummary = value
               })
@@ -667,15 +667,15 @@ export struct NoteEditPage {
               .height(120)
               .fontSize(UiConstants.BODY_SIZE)
               .backgroundColor(UiPalette.SURFACE_MUTED)
-              .borderRadius(14)
-              .padding(14)
+              .borderRadius(UiConstants.FIELD_RADIUS)
+              .padding(UiConstants.FIELD_RADIUS)
               .onChange((value: string) => {
                 this.aiActionItems = value
               })
 
             Button(this.getGeneratedTodoButtonText())
               .width('100%')
-              .height(44)
+              .height(UiConstants.COMPACT_CONTROL_HEIGHT)
               .fontSize(UiConstants.BODY_SIZE)
               .fontColor(this.shouldSaveGeneratedTodo ? Color.White : UiPalette.TEXT_PRIMARY)
               .backgroundColor(this.shouldSaveGeneratedTodo ? UiPalette.SUCCESS : UiPalette.SURFACE_MUTED)
@@ -686,7 +686,7 @@ export struct NoteEditPage {
           }
           .alignItems(HorizontalAlign.Start)
           .width('100%')
-          .padding(16)
+          .padding(UiConstants.CARD_PADDING)
           .backgroundColor(UiPalette.SURFACE)
           .borderRadius(UiConstants.CARD_RADIUS)
 
@@ -699,7 +699,7 @@ export struct NoteEditPage {
             Row({ space: 10 }) {
               Button('选择图片')
                 .layoutWeight(1)
-                .height(44)
+                .height(UiConstants.COMPACT_CONTROL_HEIGHT)
                 .fontSize(UiConstants.BODY_SIZE)
                 .fontColor(Color.White)
                 .backgroundColor(UiPalette.PRIMARY)
@@ -710,7 +710,7 @@ export struct NoteEditPage {
 
               Button('清除图片')
                 .layoutWeight(1)
-                .height(44)
+                .height(UiConstants.COMPACT_CONTROL_HEIGHT)
                 .fontSize(UiConstants.BODY_SIZE)
                 .fontColor(UiPalette.TEXT_PRIMARY)
                 .backgroundColor(UiPalette.SURFACE_MUTED)
@@ -727,7 +727,7 @@ export struct NoteEditPage {
                 Image(this.imagePath)
                   .width('100%')
                   .height(this.getImageHeight())
-                  .borderRadius(16)
+                  .borderRadius(UiConstants.MEDIA_RADIUS)
                   .objectFit(ImageFit.Cover)
 
                 Text(this.imagePath)
@@ -745,7 +745,7 @@ export struct NoteEditPage {
           }
           .alignItems(HorizontalAlign.Start)
           .width('100%')
-          .padding(16)
+          .padding(UiConstants.CARD_PADDING)
           .backgroundColor(UiPalette.SURFACE)
           .borderRadius(UiConstants.CARD_RADIUS)
 
@@ -779,10 +779,10 @@ export struct NoteEditPage {
             Row({ space: 10 }) {
               TextInput({ placeholder: '当前笔记的自定义标签，如：项目A', text: this.tagInputText })
                 .layoutWeight(1)
-                .height(44)
+                .height(UiConstants.COMPACT_CONTROL_HEIGHT)
                 .fontSize(UiConstants.BODY_SIZE)
                 .backgroundColor(UiPalette.SURFACE_MUTED)
-                .borderRadius(14)
+                .borderRadius(UiConstants.FIELD_RADIUS)
                 .padding({ left: 12, right: 12 })
                 .onChange((value: string) => {
                   this.tagInputText = value
@@ -791,7 +791,7 @@ export struct NoteEditPage {
 
               Button('添加')
                 .width(80)
-                .height(44)
+                .height(UiConstants.COMPACT_CONTROL_HEIGHT)
                 .fontSize(UiConstants.BODY_SIZE)
                 .fontColor(Color.White)
                 .backgroundColor(UiPalette.PRIMARY)
@@ -841,13 +841,13 @@ export struct NoteEditPage {
           }
           .alignItems(HorizontalAlign.Start)
           .width('100%')
-          .padding(16)
+          .padding(UiConstants.CARD_PADDING)
           .backgroundColor(UiPalette.SURFACE)
           .borderRadius(UiConstants.CARD_RADIUS)
 
           Button(this.saving ? '正在保存...' : '保存笔记')
             .width('100%')
-            .height(52)
+            .height(UiConstants.CONTROL_HEIGHT)
             .fontSize(UiConstants.BODY_SIZE)
             .fontColor(Color.White)
             .backgroundColor(UiPalette.PRIMARY)
@@ -861,7 +861,7 @@ export struct NoteEditPage {
           if (this.currentNoteId.length > 0) {
             Button(this.saving ? '正在处理...' : '删除笔记')
               .width('100%')
-              .height(52)
+              .height(UiConstants.CONTROL_HEIGHT)
               .fontSize(UiConstants.BODY_SIZE)
               .fontColor(Color.White)
               .backgroundColor(UiPalette.DANGER)

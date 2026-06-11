@@ -40,10 +40,19 @@ export class UiConstants {
   static readonly BUTTON_RADIUS: number = 999
   static readonly SECTION_SPACING: number = 24
   static readonly CONTENT_SPACING: number = 12
-  static readonly TITLE_SIZE: number = 24
+  static readonly TITLE_SIZE: number = 28
   static readonly SUBTITLE_SIZE: number = 18
   static readonly BODY_SIZE: number = 15
+  static readonly BODY_LARGE_SIZE: number = 16
   static readonly CAPTION_SIZE: number = 12
+  static readonly LABEL_SIZE: number = 14
+  static readonly CONTROL_HEIGHT: number = 56
+  static readonly COMPACT_CONTROL_HEIGHT: number = 44
+  static readonly CARD_PADDING: number = 16
+  static readonly FORM_PADDING: number = 30
+  static readonly FIELD_RADIUS: number = 14
+  static readonly MEDIA_RADIUS: number = 16
+  static readonly ICON_SIZE: number = 20
   static readonly CARD_SHADOW_RADIUS: number = 24
 }
 

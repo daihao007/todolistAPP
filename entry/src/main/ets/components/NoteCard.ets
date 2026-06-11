@@ -75,8 +75,8 @@ export struct NoteCard {
           Checkbox({ name: 'noteCheck', group: 'notes' })
             .select(this.todoStatus === TodoVisualStatus.COMPLETED)
             .selectedColor(UiPalette.SUCCESS)
-            .width(20)
-            .height(20)
+            .width(UiConstants.ICON_SIZE)
+            .height(UiConstants.ICON_SIZE)
             .margin({ right: 12, top: 2 })
             .onChange((value: boolean) => {
               this.dispatchStatusChange(value ? TodoVisualStatus.COMPLETED : TodoVisualStatus.PENDING)
@@ -86,7 +86,7 @@ export struct NoteCard {
         Column({ space: 8 }) {
           /* 标题：保留删除线逻辑 */
           Text(this.title)
-            .fontSize(18)
+            .fontSize(UiConstants.SUBTITLE_SIZE)
             .fontWeight(FontWeight.Bold)
             .fontColor(this.todoStatus === TodoVisualStatus.COMPLETED ? UiPalette.TEXT_MUTED : UiPalette.TEXT_PRIMARY)
             .maxLines(1)
@@ -144,7 +144,7 @@ export struct NoteCard {
           Image(this.imagePath)
             .width('100%')
             .height(this.getImageHeight())
-            .borderRadius(16)
+            .borderRadius(UiConstants.MEDIA_RADIUS)
             .objectFit(ImageFit.Cover)
 
           Text('已插入图片')
@@ -175,7 +175,7 @@ export struct NoteCard {
       .alignItems(VerticalAlign.Center)
     }
     .width('100%')
-    .padding(16)
+    .padding(UiConstants.CARD_PADDING)
     .backgroundColor(UiPalette.SURFACE)
     .borderRadius(UiConstants.CARD_RADIUS)
     .borderWidth(1)
