@@ -416,7 +416,8 @@ if (BreakpointUtil.currentBreakpoint === Breakpoint.SM) {
 - 修复 `ForEach` 复用导致左侧卡片不实时重绘的问题，将预览字段纳入平板列表 key。
 - DevEco/Hvigor `assembleHap` 构建成功。
 - 2560x1600 平板模拟器验证通过：笔记/待办嵌入、新建、编辑、保存、列表刷新、选中态和实时预览均正常，无 `TypeError`、`JS_ERROR` 或闪退。
-- 当前环境仅有平板模拟器；手机导航分支已完成代码路径检查和编译验证，尚未在手机设备上运行。
+- 1320x2856 手机模拟器验证通过：主页保持单栏 `Tabs`，笔记和待办均通过 `router.pushUrl` 打开独立页面；新建、保存返回、列表刷新、点击已有卡片再次进入详情及系统返回键均正常。
+- 手机与平板测试日志中均无 `TypeError`、`JS_ERROR` 或运行时闪退。
 - 实现提交已合并到 `main`：`2de57da feat: add tablet split-view editing`。
 
 ### 预计工作量: 2天
