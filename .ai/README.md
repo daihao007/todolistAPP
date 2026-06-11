@@ -16,6 +16,7 @@
 | [constants.md](constants.md) | 常量定义、路由配置、主题色值 |
 | [task-division.md](task-division.md) | Native增强与多端适配的五人分工方案 |
 | [responsive-breakpoint-work.md](responsive-breakpoint-work.md) | 分工 3 响应式布局断点系统完成记录 |
+| [tablet-split-view-work.md](tablet-split-view-work.md) | 分工 4 平板列表-详情分栏架构完成记录 |
 | [test-cases.md](test-cases.md) | 本地AI功能测试用例（8个场景）和 Native 密码加密测试记录 |
 
 ## 快速导航
@@ -27,4 +28,5 @@
 - **想改数据结构？** → [data-models.md](data-models.md)
 - **想看大作业分工？** → [task-division.md](task-division.md)
 - **想看分工 3 做了什么？** → [responsive-breakpoint-work.md](responsive-breakpoint-work.md)
+- **想看分工 4 做了什么？** → [tablet-split-view-work.md](tablet-split-view-work.md)
 - **想跑测试用例？** → [test-cases.md](test-cases.md)

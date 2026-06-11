@@ -300,6 +300,8 @@ Column() {
 
 **交付物**: SideBarContainer 列表-详情双栏布局，类似 Notion
 
+**状态**: 已完成（2026-06-11）
+
 ### 具体任务
 
 1. 改造 `Index.ets`：平板端使用 `SideBarContainer`，左侧列表（360vp）右侧详情
@@ -402,6 +404,20 @@ if (BreakpointUtil.currentBreakpoint === Breakpoint.SM) {
 2. 平板端：左侧 360vp 列表栏，右侧显示详情编辑页
 3. 点击列表项，右侧实时切换显示对应笔记/待办
 4. 编辑保存后，列表自动刷新
+
+### 完成记录（2026-06-11）
+
+- `Index.ets` 已按 `LG` 断点切换到 `SideBarContainer(SideBarContainerType.Embed)`，侧栏宽度固定为 360vp。
+- 左侧集成笔记/待办切换、搜索、标签筛选、列表、选中边框和新建按钮，右侧嵌入对应编辑组件。
+- `NoteEditPage.ets` 和 `TodoDetailPage.ets` 已增加 `@Prop isEmbedded` 与 `@Prop noteId`；嵌入模式不再使用页面级 `Scroll`，独立页面模式保持原有路由行为。
+- 手机和 MD 断点继续使用 `router.pushUrl`；LG 平板通过 `selectedNoteId`、`selectedType` 和 `showEmbeddedEditor` 直接更新右侧组件。
+- 编辑标题、正文、图片、标签和待办状态时，通过 `onDraftChange` 实时更新左侧卡片；保存和删除后自动刷新列表及选中状态。
+- 修复 ArkUI V1 中函数回调使用 `@Prop` 导致的运行时崩溃，回调改为普通组件属性。
+- 修复 `ForEach` 复用导致左侧卡片不实时重绘的问题，将预览字段纳入平板列表 key。
+- DevEco/Hvigor `assembleHap` 构建成功。
+- 2560x1600 平板模拟器验证通过：笔记/待办嵌入、新建、编辑、保存、列表刷新、选中态和实时预览均正常，无 `TypeError`、`JS_ERROR` 或闪退。
+- 当前环境仅有平板模拟器；手机导航分支已完成代码路径检查和编译验证，尚未在手机设备上运行。
+- 实现提交已合并到 `main`：`2de57da feat: add tablet split-view editing`。
 
 ### 预计工作量: 2天
 
