@@ -19,20 +19,20 @@ struct LoginPage {
           .borderRadius(24)
           .shadow({ radius: 20, color: '#105C5454', offsetY: 10 })
         Text('灵感笔记')
-          .fontSize(28)
+          .fontSize(UiConstants.TITLE_SIZE)
           .fontWeight(FontWeight.Bold)
           .fontColor(UiPalette.TEXT_PRIMARY)
           .margin({ top: 10 })
         Text('生活碎片，云端珍藏 ☁️')
-          .fontSize(14)
+          .fontSize(UiConstants.LABEL_SIZE)
           .fontColor(UiPalette.TEXT_SECONDARY)
       }.margin({ top: 80, bottom: 40 })
 
       // 2. 输入区
       TextInput({ placeholder: '在此输入账号' })
         .onChange(v => this.username = v)
-        .height(56)
-        .fontSize(16)
+        .height(UiConstants.CONTROL_HEIGHT)
+        .fontSize(UiConstants.BODY_LARGE_SIZE)
         .borderRadius(UiConstants.BUTTON_RADIUS)
         .backgroundColor(UiPalette.SURFACE)
         .placeholderColor(UiPalette.TEXT_MUTED)
@@ -41,8 +41,8 @@ struct LoginPage {
       TextInput({ placeholder: '请输入密码' })
         .type(InputType.Password)
         .onChange(v => this.password = v)
-        .height(56)
-        .fontSize(16)
+        .height(UiConstants.CONTROL_HEIGHT)
+        .fontSize(UiConstants.BODY_LARGE_SIZE)
         .borderRadius(UiConstants.BUTTON_RADIUS)
         .backgroundColor(UiPalette.SURFACE)
         .placeholderColor(UiPalette.TEXT_MUTED)
@@ -50,8 +50,8 @@ struct LoginPage {
 
       // 3. 登录按钮
       Button('登 录')
-        .width('100%').height(56).margin({ top: 20 })
-        .fontSize(18)
+        .width('100%').height(UiConstants.CONTROL_HEIGHT).margin({ top: 20 })
+        .fontSize(UiConstants.SUBTITLE_SIZE)
         .fontWeight(FontWeight.Medium)
         .backgroundColor(UiPalette.PRIMARY)
         .fontColor('#FFFFFF')
@@ -67,16 +67,16 @@ struct LoginPage {
 
       // 4. 注册入口
       Row() {
-        Text('还没有账号？').fontColor(UiPalette.TEXT_SECONDARY).fontSize(14)
+        Text('还没有账号？').fontColor(UiPalette.TEXT_SECONDARY).fontSize(UiConstants.LABEL_SIZE)
         Text('立即注册 ✨')
           .fontColor(UiPalette.PRIMARY)
-          .fontSize(14)
+          .fontSize(UiConstants.LABEL_SIZE)
           .fontWeight(FontWeight.Bold)
           .onClick(() => {
             router.pushUrl({ url: 'pages/RegisterPage' });
           })
       }.margin({ top: 20 })
     }
-    .padding(30).width('100%').height('100%').backgroundColor(UiPalette.PAGE_BACKGROUND)
+    .padding(UiConstants.FORM_PADDING).width('100%').height('100%').backgroundColor(UiPalette.PAGE_BACKGROUND)
   }
 }

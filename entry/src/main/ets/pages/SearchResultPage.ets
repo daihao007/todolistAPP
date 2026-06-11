@@ -251,7 +251,7 @@ export struct SearchResultPage {
         // 头部标题区
         Column({ space: 6 }) {
           Text('搜索结果')
-            .fontSize(28)
+            .fontSize(UiConstants.TITLE_SIZE)
             .fontWeight(FontWeight.Bold)
             .fontColor(UiPalette.TEXT_PRIMARY)
 
@@ -267,10 +267,10 @@ export struct SearchResultPage {
           Stack({ alignContent: Alignment.End }) {
             TextInput({ placeholder: '输入关键字搜索...', text: this.keyword })
               .width('100%')
-              .height(52)
+              .height(UiConstants.CONTROL_HEIGHT)
               .fontSize(UiConstants.BODY_SIZE)
               .backgroundColor(UiPalette.SURFACE_MUTED)
-              .borderRadius(14)
+              .borderRadius(UiConstants.FIELD_RADIUS)
               .padding({ left: 14, right: 40 })
               .onChange((value: string) => {
                 this.keyword = value
@@ -279,8 +279,8 @@ export struct SearchResultPage {
 
             if (this.keyword.length > 0) {
               Image($r('app.media.ic_clear'))
-                .width(20)
-                .height(20)
+                .width(UiConstants.ICON_SIZE)
+                .height(UiConstants.ICON_SIZE)
                 .margin({ right: 12 })
                 .fillColor(UiPalette.TEXT_SECONDARY)
                 .onClick(() => {
@@ -293,10 +293,10 @@ export struct SearchResultPage {
           Row({ space: 10 }) {
             TextInput({ placeholder: '开始日期：2026-05-06 / 5月6日 / 今天', text: this.startDate })
               .layoutWeight(1)
-              .height(52)
+              .height(UiConstants.CONTROL_HEIGHT)
               .fontSize(UiConstants.BODY_SIZE)
               .backgroundColor(UiPalette.SURFACE_MUTED)
-              .borderRadius(14)
+              .borderRadius(UiConstants.FIELD_RADIUS)
               .onChange((value: string) => {
                 this.startDate = value
                 void this.handleSearch()
@@ -304,10 +304,10 @@ export struct SearchResultPage {
 
             TextInput({ placeholder: '结束日期：20260506 / 2026.5.6 / 昨天', text: this.endDate })
               .layoutWeight(1)
-              .height(52)
+              .height(UiConstants.CONTROL_HEIGHT)
               .fontSize(UiConstants.BODY_SIZE)
               .backgroundColor(UiPalette.SURFACE_MUTED)
-              .borderRadius(14)
+              .borderRadius(UiConstants.FIELD_RADIUS)
               .onChange((value: string) => {
                 this.endDate = value
                 void this.handleSearch()
@@ -381,10 +381,10 @@ export struct SearchResultPage {
 
           TextInput({ placeholder: '输入自定义标签搜索，多个用空格或逗号分隔', text: this.customTagKeyword })
             .width('100%')
-            .height(44)
+            .height(UiConstants.COMPACT_CONTROL_HEIGHT)
             .fontSize(UiConstants.BODY_SIZE)
             .backgroundColor(UiPalette.SURFACE_MUTED)
-            .borderRadius(14)
+            .borderRadius(UiConstants.FIELD_RADIUS)
             .padding({ left: 14, right: 14 })
             .onChange((value: string) => {
               this.customTagKeyword = value
@@ -395,7 +395,7 @@ export struct SearchResultPage {
             .fontSize(UiConstants.CAPTION_SIZE)
             .fontColor(UiPalette.SUCCESS)
         }
-        .padding(16)
+        .padding(UiConstants.CARD_PADDING)
         .width('100%')
         .backgroundColor(UiPalette.SURFACE)
         .borderRadius(UiConstants.CARD_RADIUS)
