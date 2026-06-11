@@ -21,10 +21,15 @@ class TagOption {
   }
 }
 
-@Entry
 @Component
 export struct TodoDetailPage {
   @StorageProp('currentBreakpoint') currentBreakpoint: Breakpoint = Breakpoint.SM
+  @Prop isEmbedded: boolean = false
+  @Prop @Watch('onNoteIdChanged') noteId: string = ''
+  onSaved: (noteId: string) => void = () => {}
+  onDeleted: (noteId: string) => void = () => {}
+  onDraftChange: (title: string, content: string, imagePath: string, tags: string[],
+    todoStatus: TodoVisualStatus) => void = () => {}
   @State titleText: string = ''
   @State contentText: string = ''
   @State imagePath: string = ''
@@ -35,13 +40,13 @@ export struct TodoDetailPage {
   @State aiSummary: string = ''
   @State aiActionItems: string = ''
   @State aiLoading: boolean = false
-  @State todoStatus: TodoVisualStatus = TodoVisualStatus.PENDING
+  @State @Watch('onTodoStatusChanged') todoStatus: TodoVisualStatus = TodoVisualStatus.PENDING
   @State helperText: string = ''
   @State showError: boolean = false
   @State loading: boolean = true
   @State saving: boolean = false
   @State pageTitle: string = '新建待办事项'
-  private noteId: string = ''
+  @State currentNoteId: string = ''
   private createTime: number = Date.now()
   private noteService: NoteService | null = null
   private imageService: ImageService | null = null
@@ -56,6 +61,12 @@ export struct TodoDetailPage {
     void this.loadInitialState()
   }
 
+  private onNoteIdChanged(): void {
+    if (this.isEmbedded) {
+      void this.loadInitialState()
+    }
+  }
+
   private ensureServices(): void {
     if (this.noteService !== null && this.imageService !== null) {
       return
@@ -67,8 +78,9 @@ export struct TodoDetailPage {
 
   private async loadInitialState(): Promise<void> {
     this.loading = true
-    this.noteId = this.readRouteNoteId()
-    if (this.noteId.length === 0) {
+    this.resetEditorState()
+    this.currentNoteId = this.resolveNoteId()
+    if (this.currentNoteId.length === 0) {
       this.pageTitle = '新建待办事项'
       this.createTime = Date.now()
       this.contentText = '在这里记录待办事项，保存后会自动刷新。'
@@ -87,7 +99,7 @@ export struct TodoDetailPage {
       return
     }
     try {
-      const note = await noteService.getNoteDetail(this.noteId)
+      const note = await noteService.getNoteDetail(this.currentNoteId)
       if (note === null) {
         this.showError = true
         this.helperText = '未找到要编辑的待办事项。'
@@ -115,13 +127,44 @@ export struct TodoDetailPage {
     }
   }
 
-  private readRouteNoteId(): string {
-    const params = router.getParams() as Record<string, string> | undefined
+  private resetEditorState(): void {
+    this.titleText = ''
+    this.contentText = ''
+    this.imagePath = ''
+    this.selectedTags = []
+    this.aiSelectedTags = []
+    this.aiTagsText = ''
+    this.aiKeywordsText = ''
+    this.aiSummary = ''
+    this.aiActionItems = ''
+    this.todoStatus = TodoVisualStatus.PENDING
+    this.helperText = ''
+    this.showError = false
+  }
+
+  private resolveNoteId(): string {
+    if (this.isEmbedded) {
+      return this.noteId
+    }
+    const params = router.getParams() as Record<string, string | number> | undefined
     if (params === undefined) {
       return ''
     }
     const noteId = params.noteId
-    return typeof noteId === 'string' ? noteId : ''
+    if (typeof noteId === 'string') {
+      return noteId
+    }
+    return typeof noteId === 'number' ? noteId.toString() : ''
+  }
+
+  private notifyDraftChange(): void {
+    if (this.isEmbedded) {
+      this.onDraftChange(this.titleText, this.contentText, this.imagePath, this.selectedTags, this.todoStatus)
+    }
+  }
+
+  private onTodoStatusChanged(): void {
+    this.notifyDraftChange()
   }
 
   private toggleTag(label: string): void {
@@ -129,9 +172,11 @@ export struct TodoDetailPage {
     if (exists) {
       this.selectedTags = this.selectedTags.filter((item: string) => item !== label)
       this.removeAiTagSelection(label)
+      this.notifyDraftChange()
       return
     }
     this.selectedTags = [...this.selectedTags, label]
+    this.notifyDraftChange()
   }
 
   private buildEditorInput(): NoteEditorInput {
@@ -168,6 +213,7 @@ export struct TodoDetailPage {
         this.selectedTags = [...this.selectedTags, tag]
       }
     })
+    this.notifyDraftChange()
   }
 
   private removeAiTagSelection(label: string): void {
@@ -196,6 +242,7 @@ export struct TodoDetailPage {
       this.aiSummary = aiResult.summary
       this.aiActionItems = aiResult.actionItems.join('；')
       this.todoStatus = aiResult.todoStatus === TodoVisualStatus.NONE ? TodoVisualStatus.PENDING : aiResult.todoStatus
+      this.notifyDraftChange()
       this.helperText = '本地 AI 推荐已生成，可以继续编辑后保存。'
     } catch (error) {
       this.showError = true
@@ -243,6 +290,7 @@ export struct TodoDetailPage {
       const nextPath = await imageService.pickSingleImage()
       if (nextPath.length > 0) {
         this.imagePath = nextPath
+        this.notifyDraftChange()
       }
     } catch (error) {
       this.showError = true
@@ -271,21 +319,26 @@ export struct TodoDetailPage {
 
     try {
       const editorInput = this.buildEditorInput()
-      if (this.noteId.length === 0) {
+      if (this.currentNoteId.length === 0) {
         const note = await noteService.createNote(editorInput)
-        this.noteId = note.id
+        this.currentNoteId = note.id
         this.createTime = note.createTime
       } else {
-        const note = await noteService.updateNote(this.noteId, editorInput)
+        const note = await noteService.updateNote(this.currentNoteId, editorInput)
         this.createTime = note.createTime
       }
-      router.replaceUrl({
-        url: CommonConstants.PAGE_INDEX,
-        params: {
-          refreshAt: Date.now().toString(),
-          targetTab: '1'
-        }
-      })
+      if (this.isEmbedded) {
+        this.onSaved(this.currentNoteId)
+        promptAction.showToast({ message: '待办已保存' })
+      } else {
+        router.replaceUrl({
+          url: CommonConstants.PAGE_INDEX,
+          params: {
+            refreshAt: Date.now().toString(),
+            targetTab: '1'
+          }
+        })
+      }
     } catch (error) {
       this.showError = true
       this.helperText = '保存失败，请稍后重试。'
@@ -296,7 +349,7 @@ export struct TodoDetailPage {
   }
 
   private async deleteTodo(): Promise<void> {
-    if (this.noteId.length === 0) {
+    if (this.currentNoteId.length === 0) {
       router.back()
       return
     }
@@ -312,14 +365,20 @@ export struct TodoDetailPage {
     this.showError = false
     this.helperText = ''
     try {
-      await noteService.deleteTodo(this.noteId)
-      router.replaceUrl({
-        url: CommonConstants.PAGE_INDEX,
-        params: {
-          refreshAt: Date.now().toString(),
-          targetTab: '1'
-        }
-      })
+      const deletedNoteId = this.currentNoteId
+      await noteService.deleteTodo(this.currentNoteId)
+      if (this.isEmbedded) {
+        this.onDeleted(deletedNoteId)
+        promptAction.showToast({ message: '待办已删除' })
+      } else {
+        router.replaceUrl({
+          url: CommonConstants.PAGE_INDEX,
+          params: {
+            refreshAt: Date.now().toString(),
+            targetTab: '1'
+          }
+        })
+      }
     } catch (error) {
       this.showError = true
       this.helperText = '删除失败，请稍后重试。'
@@ -345,9 +404,8 @@ export struct TodoDetailPage {
     return BreakpointUtil.getImageHeight(this.currentBreakpoint)
   }
 
-  build() {
-    Scroll() {
-      Column({ space: UiConstants.SECTION_SPACING }) {
+  @Builder EditorContent() {
+    Column({ space: UiConstants.SECTION_SPACING }) {
         Column({ space: 6 }) {
           Text(this.pageTitle)
             .fontSize(28)
@@ -382,6 +440,7 @@ export struct TodoDetailPage {
               .padding({ left: 14, right: 14 })
               .onChange((value: string) => {
                 this.titleText = value
+                this.notifyDraftChange()
                 if (value.trim().length > 0) {
                   this.showError = false
                   if (this.helperText === '标题不能为空。') {
@@ -417,6 +476,7 @@ export struct TodoDetailPage {
               .padding(14)
               .onChange((value: string) => {
                 this.contentText = value
+                this.notifyDraftChange()
               })
           }
           .alignItems(HorizontalAlign.Start)
@@ -545,6 +605,7 @@ export struct TodoDetailPage {
                 .borderRadius(UiConstants.BUTTON_RADIUS)
                 .onClick(() => {
                   this.imagePath = ''
+                  this.notifyDraftChange()
                 })
             }
             .width('100%')
@@ -631,7 +692,7 @@ export struct TodoDetailPage {
               }
             })
 
-          if (this.noteId.length > 0) {
+          if (this.currentNoteId.length > 0) {
             Button(this.saving ? '正在处理...' : '删除待办')
               .width('100%')
               .height(52)
@@ -670,19 +731,40 @@ export struct TodoDetailPage {
           .alignItems(HorizontalAlign.Start)
           .width('100%')
         }
+    }
+    .padding(this.getPagePadding())
+    .width('100%')
+    .constraintSize({ maxWidth: this.getContentMaxWidth() })
+    .alignSelf(ItemAlign.Center)
+    .alignItems(HorizontalAlign.Start)
+  }
+
+  build() {
+    if (this.isEmbedded) {
+      this.EditorContent()
+    } else {
+      Scroll() {
+        this.EditorContent()
       }
-      .padding(this.getPagePadding())
       .width('100%')
-      .constraintSize({ maxWidth: this.getContentMaxWidth() })
-      .alignSelf(ItemAlign.Center)
-      .alignItems(HorizontalAlign.Start)
+      .height('100%')
+      .scrollBar(BarState.Off)
+      .backgroundColor(UiPalette.PAGE_BACKGROUND)
+      .onAreaChange((oldArea: Area, newArea: Area) => {
+        BreakpointUtil.updateByWidth(newArea.width.toString())
+      })
+    }
+  }
+}
+
+@Entry
+@Component
+struct TodoDetailPageEntry {
+  build() {
+    Stack() {
+      TodoDetailPage()
     }
     .width('100%')
     .height('100%')
-    .scrollBar(BarState.Off)
-    .backgroundColor(UiPalette.PAGE_BACKGROUND)
-    .onAreaChange((oldArea: Area, newArea: Area) => {
-      BreakpointUtil.updateByWidth(newArea.width.toString())
-    })
   }
 }

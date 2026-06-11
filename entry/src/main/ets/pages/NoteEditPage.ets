@@ -20,10 +20,15 @@ class TagOption {
   }
 }
 
-@Entry
 @Component
 export struct NoteEditPage {
   @StorageProp('currentBreakpoint') currentBreakpoint: Breakpoint = Breakpoint.SM
+  @Prop isEmbedded: boolean = false
+  @Prop @Watch('onNoteIdChanged') noteId: string = ''
+  onSaved: (noteId: string) => void = () => {}
+  onDeleted: (noteId: string) => void = () => {}
+  onDraftChange: (title: string, content: string, imagePath: string, tags: string[]) => void =
+    () => {}
   @State titleText: string = ''
   @State contentText: string = ''
   @State imagePath: string = ''
@@ -43,12 +48,12 @@ export struct NoteEditPage {
   @State pageTitle: string = '新建笔记'
   @State tagInputText: string = ''
   @State tagHelperText: string = ''
+  @State currentNoteId: string = ''
   @State tagOptions: TagOption[] = [
     new TagOption('工作', UiPalette.TAG_WORK),
     new TagOption('学习', UiPalette.TAG_STUDY),
     new TagOption('生活', UiPalette.TAG_LIFE)
   ]
-  private noteId: string = ''
   private createTime: number = Date.now()
   private noteService: NoteService | null = null
   private imageService: ImageService | null = null
@@ -56,6 +61,12 @@ export struct NoteEditPage {
   aboutToAppear(): void {
     this.ensureServices()
     void this.loadInitialState()
+  }
+
+  private onNoteIdChanged(): void {
+    if (this.isEmbedded) {
+      void this.loadInitialState()
+    }
   }
 
   private ensureServices(): void {
@@ -70,8 +81,9 @@ export struct NoteEditPage {
   private async loadInitialState(): Promise<void> {
     this.loading = true
     this.shouldSaveGeneratedTodo = false
-    this.noteId = this.readRouteNoteId()
-    if (this.noteId.length === 0) {
+    this.resetEditorState()
+    this.currentNoteId = this.resolveNoteId()
+    if (this.currentNoteId.length === 0) {
       this.pageTitle = '新建笔记'
       this.createTime = Date.now()
       this.contentText = ''
@@ -91,7 +103,7 @@ export struct NoteEditPage {
     }
 
     try {
-      const note = await noteService.getNoteDetail(this.noteId)
+      const note = await noteService.getNoteDetail(this.currentNoteId)
       if (note === null) {
         this.showError = true
         this.helperText = '未找到要编辑的笔记。'
@@ -119,13 +131,42 @@ export struct NoteEditPage {
     }
   }
 
-  private readRouteNoteId(): string {
-    const params = router.getParams() as Record<string, string> | undefined
+  private resetEditorState(): void {
+    this.titleText = ''
+    this.contentText = ''
+    this.imagePath = ''
+    this.selectedTags = []
+    this.aiSelectedTags = []
+    this.aiTagsText = ''
+    this.aiKeywordsText = ''
+    this.aiSummary = ''
+    this.aiActionItems = ''
+    this.todoStatus = TodoVisualStatus.NONE
+    this.helperText = ''
+    this.showError = false
+    this.tagInputText = ''
+    this.tagHelperText = ''
+  }
+
+  private resolveNoteId(): string {
+    if (this.isEmbedded) {
+      return this.noteId
+    }
+    const params = router.getParams() as Record<string, string | number> | undefined
     if (params === undefined) {
       return ''
     }
     const noteId = params.noteId
-    return typeof noteId === 'string' ? noteId : ''
+    if (typeof noteId === 'string') {
+      return noteId
+    }
+    return typeof noteId === 'number' ? noteId.toString() : ''
+  }
+
+  private notifyDraftChange(): void {
+    if (this.isEmbedded) {
+      this.onDraftChange(this.titleText, this.contentText, this.imagePath, this.selectedTags)
+    }
   }
 
   private toggleTag(label: string): void {
@@ -133,9 +174,11 @@ export struct NoteEditPage {
     if (exists) {
       this.selectedTags = this.selectedTags.filter((item: string) => item !== label)
       this.removeAiTagSelection(label)
+      this.notifyDraftChange()
       return
     }
     this.selectedTags = [...this.selectedTags, label]
+    this.notifyDraftChange()
   }
 
   private addCustomTag(): void {
@@ -150,11 +193,13 @@ export struct NoteEditPage {
     }
     this.tagInputText = ''
     this.tagHelperText = '已添加到当前笔记的自定义标签。'
+    this.notifyDraftChange()
   }
 
   private removeTag(label: string): void {
     this.selectedTags = this.selectedTags.filter((tag: string) => tag !== label)
     this.removeAiTagSelection(label)
+    this.notifyDraftChange()
   }
 
   private getCustomSelectedTags(): string[] {
@@ -230,6 +275,7 @@ export struct NoteEditPage {
         this.selectedTags = [...this.selectedTags, tag]
       }
     })
+    this.notifyDraftChange()
   }
 
   private removeAiTagSelection(label: string): void {
@@ -341,6 +387,7 @@ export struct NoteEditPage {
       const nextPath = await imageService.pickSingleImage()
       if (nextPath.length > 0) {
         this.imagePath = nextPath
+        this.notifyDraftChange()
       }
     } catch (error) {
       this.showError = true
@@ -369,12 +416,12 @@ export struct NoteEditPage {
 
     try {
       const editorInput = this.buildEditorInput()
-      if (this.noteId.length === 0) {
+      if (this.currentNoteId.length === 0) {
         const note = await noteService.createNote(editorInput)
-        this.noteId = note.id
+        this.currentNoteId = note.id
         this.createTime = note.createTime
       } else {
-        const note = await noteService.updateNote(this.noteId, editorInput)
+        const note = await noteService.updateNote(this.currentNoteId, editorInput)
         this.createTime = note.createTime
       }
       if (this.shouldSaveGeneratedTodo) {
@@ -383,12 +430,17 @@ export struct NoteEditPage {
           await noteService.createNote(input)
         }
       }
-      router.replaceUrl({
-        url: CommonConstants.PAGE_INDEX,
-        params: {
-          refreshAt: Date.now().toString()
-        }
-      })
+      if (this.isEmbedded) {
+        this.onSaved(this.currentNoteId)
+        promptAction.showToast({ message: '笔记已保存' })
+      } else {
+        router.replaceUrl({
+          url: CommonConstants.PAGE_INDEX,
+          params: {
+            refreshAt: Date.now().toString()
+          }
+        })
+      }
     } catch (error) {
       this.showError = true
       this.helperText = '保存失败，请稍后重试。'
@@ -399,7 +451,7 @@ export struct NoteEditPage {
   }
 
   private async deleteNote(): Promise<void> {
-    if (this.noteId.length === 0) {
+    if (this.currentNoteId.length === 0) {
       router.back()
       return
     }
@@ -415,13 +467,19 @@ export struct NoteEditPage {
     this.showError = false
     this.helperText = ''
     try {
-      await noteService.deleteNote(this.noteId)
-      router.replaceUrl({
-        url: CommonConstants.PAGE_INDEX,
-        params: {
-          refreshAt: Date.now().toString()
-        }
-      })
+      const deletedNoteId = this.currentNoteId
+      await noteService.deleteNote(this.currentNoteId)
+      if (this.isEmbedded) {
+        this.onDeleted(deletedNoteId)
+        promptAction.showToast({ message: '笔记已删除' })
+      } else {
+        router.replaceUrl({
+          url: CommonConstants.PAGE_INDEX,
+          params: {
+            refreshAt: Date.now().toString()
+          }
+        })
+      }
     } catch (error) {
       this.showError = true
       this.helperText = '删除失败，请稍后重试。'
@@ -447,9 +505,8 @@ export struct NoteEditPage {
     return BreakpointUtil.getImageHeight(this.currentBreakpoint)
   }
 
-  build() {
-    Scroll() {
-      Column({ space: UiConstants.SECTION_SPACING }) {
+  @Builder EditorContent() {
+    Column({ space: UiConstants.SECTION_SPACING }) {
         Column({ space: 6 }) {
           Text(this.pageTitle)
             .fontSize(28)
@@ -484,6 +541,7 @@ export struct NoteEditPage {
               .padding({ left: 14, right: 14 })
               .onChange((value: string) => {
                 this.titleText = value
+                this.notifyDraftChange()
                 if (value.trim().length > 0) {
                   this.showError = false
                   if (this.helperText === '标题不能为空。') {
@@ -519,6 +577,7 @@ export struct NoteEditPage {
               .padding(14)
               .onChange((value: string) => {
                 this.contentText = value
+                this.notifyDraftChange()
               })
           }
           .alignItems(HorizontalAlign.Start)
@@ -658,6 +717,7 @@ export struct NoteEditPage {
                 .borderRadius(UiConstants.BUTTON_RADIUS)
                 .onClick(() => {
                   this.imagePath = ''
+                  this.notifyDraftChange()
                 })
             }
             .width('100%')
@@ -798,7 +858,7 @@ export struct NoteEditPage {
               }
             })
 
-          if (this.noteId.length > 0) {
+          if (this.currentNoteId.length > 0) {
             Button(this.saving ? '正在处理...' : '删除笔记')
               .width('100%')
               .height(52)
@@ -854,19 +914,40 @@ export struct NoteEditPage {
           .alignItems(HorizontalAlign.Start)
           .width('100%')
         }
+    }
+    .padding(this.getPagePadding())
+    .width('100%')
+    .constraintSize({ maxWidth: this.getContentMaxWidth() })
+    .alignSelf(ItemAlign.Center)
+    .alignItems(HorizontalAlign.Start)
+  }
+
+  build() {
+    if (this.isEmbedded) {
+      this.EditorContent()
+    } else {
+      Scroll() {
+        this.EditorContent()
       }
-      .padding(this.getPagePadding())
       .width('100%')
-      .constraintSize({ maxWidth: this.getContentMaxWidth() })
-      .alignSelf(ItemAlign.Center)
-      .alignItems(HorizontalAlign.Start)
+      .height('100%')
+      .scrollBar(BarState.Off)
+      .backgroundColor(UiPalette.PAGE_BACKGROUND)
+      .onAreaChange((oldArea: Area, newArea: Area) => {
+        BreakpointUtil.updateByWidth(newArea.width.toString())
+      })
+    }
+  }
+}
+
+@Entry
+@Component
+struct NoteEditPageEntry {
+  build() {
+    Stack() {
+      NoteEditPage()
     }
     .width('100%')
     .height('100%')
-    .scrollBar(BarState.Off)
-    .backgroundColor(UiPalette.PAGE_BACKGROUND)
-    .onAreaChange((oldArea: Area, newArea: Area) => {
-      BreakpointUtil.updateByWidth(newArea.width.toString())
-    })
   }
 }
