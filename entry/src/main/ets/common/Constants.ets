@@ -21,9 +21,9 @@ export class CommonConstants {
   static readonly PAGE_SEARCH: string = 'pages/SearchResultPage'
 
   static readonly DEFAULT_TAGS: string[] = ['工作', '学习', '生活']
-  static readonly AI_CLOUD_API_URL: string = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions'
-  static readonly AI_CLOUD_API_KEY: string = 'sk-576671c9511a427186ea9eaac0d3a9ef'
-  static readonly AI_CLOUD_MODEL: string = 'qwen3.5-122b-a10b'
+  static readonly AI_CLOUD_API_URL: string = 'https://token-plan-cn.xiaomimimo.com/v1/chat/completions'
+  static readonly AI_CLOUD_API_KEY: string = 'tp-c9cqps25t5rt2s647ass0ceje248scgexi3967it5zq862cs'
+  static readonly AI_CLOUD_MODEL: string = 'mimo-v2-omni'
 }
 
 export enum TodoVisualStatus {
